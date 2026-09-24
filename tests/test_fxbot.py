@@ -69,11 +69,14 @@ def test_buy_signal_only_when_cheap():
     assert strategy.evaluate(quote("USD", 1400), USD, [], s) == []
 
 
-def test_additional_buy_needs_further_drop():
-    s = Strategy(buy_percentile=20, add_step_pct=1.5)
-    lots = replay([buy("USD", 1330, 100)], {"USD": USD})["USD"]
-    assert strategy.evaluate(quote("USD", 1320), USD, lots, s) == []
-    assert [x.side for x in strategy.evaluate(quote("USD", 1305), USD, lots, s)] == ["buy"]
+def test_additional_buy_only_below_average():
+    s = Strategy(buy_percentile=20)
+    buys = lambda lots, price: [x for x in strategy.evaluate(quote("USD", price), USD, lots, s) if x.side == "buy"]
+    lots = replay([buy("USD", 1310, 100), buy("USD", 1330, 100)], {"USD": USD})["USD"]  # 평균 1320
+    assert buys(lots, 1320) == []
+    assert len(buys(lots, 1319)) == 1
+    many = replay([buy("USD", 1330, 1)] * 10, {"USD": USD})["USD"]
+    assert len(buys(many, 1320)) == 1  # 횟수 제한 없음
 
 
 def test_alert_dedup_and_reset():

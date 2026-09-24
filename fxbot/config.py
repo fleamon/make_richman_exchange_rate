@@ -20,8 +20,6 @@ class Currency:
 class Strategy:
     lookback_days: int = 90
     buy_percentile: float = 5
-    add_step_pct: float = 1.5
-    max_lots: int = 3
     min_profit_pct: float = 0.0
     realert_hours: float = 12
     realert_move_pct: float = 0.5

@@ -1,7 +1,7 @@
 """매수·매도 신호 판단.
 
 - 매수: 현재 환율이 최근 lookback 기간 하위 buy_percentile% 이하일 때.
-  이미 보유 중이면 가장 싸게 산 환율보다 add_step_pct% 더 내려야 추가 매수 (최대 max_lots 회).
+  이미 보유 중이면 보유분 평균 매수 환율보다 쌀 때만 (횟수 제한 없음).
 - 매도: 수수료를 모두 빼고도 min_profit_pct% 넘게 이익인 lot 이 있을 때만. 손해 매도 신호는 없다.
 """
 
@@ -49,8 +49,8 @@ def evaluate(q: Quote, cur: Currency, lots: list[Lot], s: Strategy) -> list[Sign
         proceeds = amount * q.price * (1 - cur.sell_fee)
         signals.append(Signal("sell", amount=amount, profit=proceeds - sum(l.cost(cur) for l in sellable), **base))
 
-    if pct <= s.buy_percentile and len(lots) < s.max_lots:
-        if not lots or q.price <= min(l.rate for l in lots) * (1 - s.add_step_pct / 100):
+    if pct <= s.buy_percentile:
+        if not lots or q.price < sum(l.rate * l.amount for l in lots) / sum(l.amount for l in lots):
             signals.append(Signal("buy", **base))
     return signals
 
