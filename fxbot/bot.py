@@ -141,7 +141,7 @@ def signal_text(sig: Signal, cur: Currency, cfg: Config) -> str:
     rng = f"최근 {cfg.strategy.lookback_days}일 {fx(sig.low, cur)} ~ {fx(sig.high, cur)}, 현재 하위 {sig.percentile:.0f}%"
     if sig.side == "buy":
         return (f"🟢 매수 신호 {label(cur)}\n현재 {fx(sig.price, cur)} ({rng})\n"
-                f"토스 앱 환율 확인 후 체결하고 '매수 {cur.code} 환율 수량' 으로 기록해주세요.")
+                f"매수 시 '매수 {cur.code} 환율 수량' 으로 기록해주세요.")
     return (f"🔴 매도 신호 {label(cur)}\n현재 {fx(sig.price, cur)} ({rng})\n"
             f"목표 도달 수량 {sig.amount:,.2f} {cur.code}, 예상 이익 {won(sig.profit)} (수수료 차감 후)\n"
-            f"토스 앱 환율이 목표 이상인지 확인 후 체결하고 '매도 {cur.code} 환율 수량' 으로 기록해주세요.")
+            f"매도 시 '매도 {cur.code} 환율 수량' 으로 기록해주세요.")
