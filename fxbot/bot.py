@@ -42,7 +42,7 @@ def fx(v: float, cur: Currency) -> str:
 
 
 def label(cur: Currency) -> str:
-    return f"{cur.code}({cur.name}{', ' + str(cur.unit) + '단위' if cur.unit != 1 else ''})"
+    return f"{cur.code}({cur.name})"
 
 
 def _num(s: str) -> float:
