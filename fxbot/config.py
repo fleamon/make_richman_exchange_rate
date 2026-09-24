@@ -21,8 +21,6 @@ class Strategy:
     lookback_days: int = 90
     buy_percentile: float = 5
     min_profit_pct: float = 0.0
-    realert_hours: float = 12
-    realert_move_pct: float = 0.5
 
 
 @dataclass(frozen=True)

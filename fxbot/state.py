@@ -16,7 +16,7 @@ PAD = 4096  # 암호문 길이로 거래 건수를 추정하지 못하게 평문
 
 
 def empty() -> dict:
-    return {"version": 1, "tg_offset": 0, "trades": [], "alerts": {}}
+    return {"version": 1, "tg_offset": 0, "trades": []}
 
 
 def _fernet() -> Fernet:

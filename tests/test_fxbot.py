@@ -79,15 +79,10 @@ def test_additional_buy_only_below_average():
     assert len(buys(many, 1320)) == 1  # 횟수 제한 없음
 
 
-def test_alert_dedup_and_reset():
-    alerts = {}
-    q = {"USD": quote("USD", 1320)}
-    assert len(strategy.run(CFG, q, {}, alerts, NOW)) == 1
-    assert strategy.run(CFG, q, {}, alerts, NOW + timedelta(hours=1)) == []
-    assert len(strategy.run(CFG, {"USD": quote("USD", 1310)}, {}, alerts, NOW + timedelta(hours=2))) == 1
-    assert len(strategy.run(CFG, q, {}, alerts, NOW + timedelta(hours=15))) == 1
-    strategy.run(CFG, {"USD": quote("USD", 1450)}, {}, alerts, NOW)
-    assert "buy:USD" not in alerts
+def test_same_signal_sent_every_run():
+    q = {"USD": quote("USD", 1320), "JPY": quote("JPY", 14.5, 13, 15)}
+    assert [x.key for x in strategy.run(CFG, q, {})] == ["buy:USD"]
+    assert [x.key for x in strategy.run(CFG, q, {})] == ["buy:USD"]
 
 
 def test_bot_commands_use_toss_units():

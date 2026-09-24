@@ -9,7 +9,7 @@ rates  : 현재 환율과 3개월 위치를 화면에 출력 (로컬 확인용)
 """
 
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from . import config, rates, state, strategy
 from .bot import handle, rates_text, signal_text
@@ -24,7 +24,7 @@ def run() -> None:
     now = datetime.now(timezone.utc)
     tg = Telegram.from_env()
 
-    quotes, errors = rates.fetch_all(cfg.currencies, cfg.strategy.lookback_days)
+    quotes, _ = rates.fetch_all(cfg.currencies, cfg.strategy.lookback_days)
     print(f"환율 조회 {len(quotes)}/{len(cfg.currencies)}")
     if tg is None:
         print("TELEGRAM_TOKEN / TELEGRAM_CHAT_ID 가 없어 알림·명령 처리를 건너뜁니다.")
@@ -32,17 +32,13 @@ def run() -> None:
         texts, st["tg_offset"] = tg.updates(st["tg_offset"])
         for text in texts:
             tg.send(handle(text, st, cfg, quotes, now))
+        # 뒤의 신호 발송이 실패해도 처리한 명령이 다음 실행에 중복 기록되지 않게 먼저 저장한다
+        if state.dumps(st) != before:
+            state.save(st)
 
-        signals = strategy.run(cfg, quotes, replay(st["trades"], cfg.currencies), st["alerts"], now)
-        for sig in signals:
+        for sig in strategy.run(cfg, quotes, replay(st["trades"], cfg.currencies)):
             tg.send(signal_text(sig, cfg.currencies[sig.code], cfg))
-
-        last_err = st["alerts"].get("error:fetch")
-        if not errors:
-            st["alerts"].pop("error:fetch", None)
-        elif not last_err or now - datetime.fromisoformat(last_err["ts"]) >= timedelta(hours=cfg.strategy.realert_hours):
-            st["alerts"]["error:fetch"] = {"ts": now.isoformat(), "price": 0}
-            tg.send("⚠️ 환율 조회 실패\n" + "\n".join(errors))
+    st.pop("alerts", None)
 
     # 공개 로그라 명령·알림 건수나 상태 변경 여부도 남기지 않는다 (거래 활동 추정 방지)
     if state.dumps(st) != before:

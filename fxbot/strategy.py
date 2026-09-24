@@ -6,7 +6,6 @@
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 
 from .config import Config, Currency, Strategy
 from .ledger import Lot
@@ -55,28 +54,7 @@ def evaluate(q: Quote, cur: Currency, lots: list[Lot], s: Strategy) -> list[Sign
     return signals
 
 
-def should_alert(sig: Signal, alerts: dict, now: datetime, s: Strategy) -> bool:
-    """같은 신호를 매시간 반복해 보내지 않는다. 시간이 충분히 지났거나 환율이 더 유리해졌을 때만 다시 알림."""
-    prev = alerts.get(sig.key)
-    if not prev:
-        return True
-    if now - datetime.fromisoformat(prev["ts"]) >= timedelta(hours=s.realert_hours):
-        return True
-    move = s.realert_move_pct / 100
-    if sig.side == "buy":
-        return sig.price <= prev["price"] * (1 - move)
-    return sig.price >= prev["price"] * (1 + move)
+def run(cfg: Config, quotes: dict[str, Quote], lots: dict[str, list[Lot]]) -> list[Signal]:
+    """지금 조건에 맞는 신호 전부 (같은 신호도 매번 보낸다)."""
+    return [sig for code, q in quotes.items() for sig in evaluate(q, cfg.currencies[code], lots.get(code, []), cfg.strategy)]
 
-
-def run(cfg: Config, quotes: dict[str, Quote], lots: dict[str, list[Lot]], alerts: dict, now: datetime) -> list[Signal]:
-    """이번에 알릴 신호를 돌려주고 alerts 를 갱신한다. 조건이 풀린 신호는 alerts 에서 지워 다음에 다시 알리게 한다."""
-    active, to_send = set(), []
-    for code, q in quotes.items():
-        for sig in evaluate(q, cfg.currencies[code], lots.get(code, []), cfg.strategy):
-            active.add(sig.key)
-            if should_alert(sig, alerts, now, cfg.strategy):
-                alerts[sig.key] = {"ts": now.isoformat(), "price": sig.price}
-                to_send.append(sig)
-    for key in [k for k in alerts if k.split(":")[1] in quotes and k not in active]:
-        del alerts[key]
-    return to_send
