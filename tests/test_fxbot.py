@@ -12,7 +12,7 @@ NOW = datetime(2026, 9, 24, tzinfo=timezone.utc)
 USD = Currency("USD", "미국 달러")
 JPY = Currency("JPY", "일본 엔", unit=100)
 FEE = Currency("USD", "미국 달러", buy_fee=0.01, sell_fee=0.01)
-CFG = Config(Strategy(), {"USD": USD, "JPY": JPY})
+CFG = Config(Strategy(buy_percentile=20), {"USD": USD, "JPY": JPY})
 
 
 def quote(code, price, lo=1300.0, hi=1500.0, n=90):
