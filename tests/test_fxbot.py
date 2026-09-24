@@ -117,3 +117,26 @@ def test_sell_signal_on_any_profit():
     assert strategy.evaluate(quote("USD", 1400), USD, lots, Strategy(min_profit_pct=0)) == []
     sigs = strategy.evaluate(quote("USD", 1400.1), USD, lots, Strategy(min_profit_pct=0))
     assert [s.side for s in sigs] == ["sell"] and sigs[0].profit > 0
+
+
+def test_history_shows_average_of_holdings():
+    st = state.empty()
+    for cmd in ("매수 JPY 900 100000", "매수 JPY 880 100000", "매도 JPY 950 50000", "매수 USD 1300 10"):
+        bot.handle(cmd, st, CFG, {}, NOW)
+    text = bot.handle("기록", st, CFG, {}, NOW)
+    # 선입선출로 900원 5만엔 + 880원 10만엔이 남음 → 평균 886.67
+    assert "JPY(일본 엔) 150,000.00 / 평균 886.67 (2회 매수" in text
+    assert "USD(미국 달러) 10.00 / 평균 1,300.00 (1회 매수, 원가 13,000원)" in text
+
+
+def test_sell_all():
+    st = state.empty()
+    bot.handle("매수 JPY 900 100000", st, CFG, {}, NOW)
+    bot.handle("매수 JPY 880 50000", st, CFG, {}, NOW)
+    assert "환율을 가져오지 못했습니다" in bot.handle("매도 JPY 전량매도", st, CFG, {}, NOW)
+    out = bot.handle("매도 JPY 전량매도", st, CFG, {"JPY": quote("JPY", 9.5)}, NOW)
+    assert "150,000.00 @ 950.00" in out and "실현손익 85,000원" in out
+    assert "보유 기록이 없습니다" in bot.handle("매도 JPY 전량", st, CFG, {}, NOW)
+    bot.handle("매수 USD 1300 10", st, CFG, {}, NOW)
+    assert "10.00 @ 1,310.00" in bot.handle("매도 USD 1310 전량", st, CFG, {}, NOW)
+    assert "숫자" in bot.handle("매수 USD 1300 전량", st, CFG, {}, NOW)

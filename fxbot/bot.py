@@ -14,9 +14,11 @@ from .strategy import Signal, percentile, sell_target
 HELP = """사용법 (환율은 토스 앱 표시 그대로, 수량은 외화 금액)
 매수 USD 1350.5 1000   — 1,350.5원에 1,000달러 샀음
 매도 JPY 905.2 100000  — 100엔당 905.2원에 10만엔 팔았음
+매도 JPY 905.2 전량    — 100엔당 905.2원에 가진 엔화 전부 팔았음
+매도 JPY 전량매도      — 가진 엔화 전부 팔았음 (환율은 봇 처리 시점 시장 환율)
 현황   — 보유 외화, 본전·목표 환율, 평가손익
 환율   — 전체 통화 현재 환율과 3개월 위치
-기록   — 최근 거래 10건
+기록   — 보유 외화별 평균 매수 환율
 취소   — 마지막 거래 기록 삭제
 (/buy /sell /status /rates /history /undo 도 가능)"""
 
@@ -29,6 +31,7 @@ ALIASES = {
     "취소": "undo", "undo": "undo",
     "도움말": "help", "help": "help", "start": "help",
 }
+ALL = ("전량", "전량매도", "all")
 
 
 def won(v: float) -> str:
@@ -60,11 +63,23 @@ def handle(text: str, state: dict, cfg: Config, quotes: dict[str, Quote], now: d
     trades = state["trades"]
 
     if cmd in ("buy", "sell"):
-        if len(parts) != 4 or parts[1].upper() not in cfg.currencies:
-            return f"형식: {parts[0]} 통화 환율 수량\n예) 매수 USD 1350.5 1000\n지원 통화: {' '.join(cfg.currencies)}"
+        # 매도는 수량 대신 '전량(매도)' 을 쓸 수 있고, 환율까지 생략하면 처리 시점의 시장 환율로 기록한다
+        sell_all = cmd == "sell" and len(parts) in (3, 4) and parts[-1] in ALL
+        if len(parts) != 4 - (sell_all and len(parts) == 3) or parts[1].upper() not in cfg.currencies:
+            return (f"형식: {parts[0]} 통화 환율 수량\n예) 매수 USD 1350.5 1000 / 매도 JPY 전량매도\n"
+                    f"지원 통화: {' '.join(cfg.currencies)}")
         cur = cfg.currencies[parts[1].upper()]
+        held = sum(l.amount for l in replay(trades, cfg.currencies).get(cur.code, []))
+        if sell_all and not held:
+            return f"{label(cur)} 보유 기록이 없습니다."
         try:
-            rate, amount = _num(parts[2]) / cur.unit, _num(parts[3])
+            if sell_all and len(parts) == 3:
+                if cur.code not in quotes:
+                    return "지금 환율을 가져오지 못했습니다. '매도 통화 환율 전량' 으로 환율을 적어주세요."
+                rate = quotes[cur.code].price
+            else:
+                rate = _num(parts[2]) / cur.unit
+            amount = held if sell_all else _num(parts[3])
         except ValueError:
             return "환율과 수량은 0보다 큰 숫자로 적어주세요."
         trade = {"side": cmd, "code": cur.code, "rate": rate, "amount": amount, "ts": now.isoformat(timespec="seconds")}
@@ -90,11 +105,7 @@ def handle(text: str, state: dict, cfg: Config, quotes: dict[str, Quote], now: d
         return f"마지막 기록 삭제: {'매수' if t['side'] == 'buy' else '매도'} {t['code']} {t['amount']:,.2f} @ {fx(t['rate'], cur)}"
 
     if cmd == "history":
-        if not trades:
-            return "거래 기록이 없습니다."
-        lines = [f"{t['ts'][:16].replace('T', ' ')} {'매수' if t['side'] == 'buy' else '매도'} {t['code']} "
-                 f"{t['amount']:,.2f} @ {fx(t['rate'], cfg.currencies[t['code']])}" for t in trades[-10:]]
-        return "최근 거래 (UTC)\n" + "\n".join(lines)
+        return history_text(state, cfg)
 
     if cmd == "status":
         return status_text(state, cfg, quotes)
@@ -122,6 +133,19 @@ def status_text(state: dict, cfg: Config, quotes: dict[str, Quote]) -> str:
         for l in ls:
             lines.append(f"  · {l.amount:,.2f} @ {fx(l.rate, cur)} → 목표 {fx(sell_target(l, cur, cfg.strategy), cur)}")
     lines.append(f"\n총 평가손익 {won(total)}")
+    return "\n".join(lines)
+
+
+def history_text(state: dict, cfg: Config) -> str:
+    lots = replay(state["trades"], cfg.currencies)
+    if not lots:
+        return "보유 중인 외화가 없습니다."
+    lines = ["보유 외화 평균 매수 환율"]
+    for code, ls in lots.items():
+        cur = cfg.currencies[code]
+        amount = sum(l.amount for l in ls)
+        avg = sum(l.rate * l.amount for l in ls) / amount
+        lines.append(f"{label(cur)} {amount:,.2f} / 평균 {fx(avg, cur)} ({len(ls)}회 매수, 원가 {won(sum(l.cost(cur) for l in ls))})")
     return "\n".join(lines)
 
 
