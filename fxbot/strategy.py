@@ -2,7 +2,7 @@
 
 - 매수: 현재 환율이 최근 lookback 기간 하위 buy_percentile% 이하일 때.
   이미 보유 중이면 가장 싸게 산 환율보다 add_step_pct% 더 내려야 추가 매수 (최대 max_lots 회).
-- 매도: 수수료를 모두 빼고도 min_profit_pct% 이상 이익인 lot 이 있을 때만. 손해 매도 신호는 없다.
+- 매도: 수수료를 모두 빼고도 min_profit_pct% 넘게 이익인 lot 이 있을 때만. 손해 매도 신호는 없다.
 """
 
 from dataclasses import dataclass
@@ -43,7 +43,7 @@ def evaluate(q: Quote, cur: Currency, lots: list[Lot], s: Strategy) -> list[Sign
     base = dict(code=q.code, price=q.price, percentile=pct, low=min(q.history), high=max(q.history))
     signals = []
 
-    sellable = [l for l in lots if q.price >= sell_target(l, cur, s)]
+    sellable = [l for l in lots if q.price > sell_target(l, cur, s)]
     if sellable:
         amount = sum(l.amount for l in sellable)
         proceeds = amount * q.price * (1 - cur.sell_fee)

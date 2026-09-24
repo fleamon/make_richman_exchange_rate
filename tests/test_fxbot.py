@@ -110,3 +110,10 @@ def test_state_roundtrip(tmp_path, monkeypatch):
     size = path.stat().st_size
     state.save({**st, "trades": st["trades"] * 5}, path)
     assert path.stat().st_size == size  # 거래가 늘어도 파일 크기로 드러나지 않음
+
+
+def test_sell_signal_on_any_profit():
+    lots = replay([buy("USD", 1400, 100)], {"USD": USD})["USD"]
+    assert strategy.evaluate(quote("USD", 1400), USD, lots, Strategy(min_profit_pct=0)) == []
+    sigs = strategy.evaluate(quote("USD", 1400.1), USD, lots, Strategy(min_profit_pct=0))
+    assert [s.side for s in sigs] == ["sell"] and sigs[0].profit > 0

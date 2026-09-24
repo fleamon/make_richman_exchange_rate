@@ -73,7 +73,7 @@ def handle(text: str, state: dict, cfg: Config, quotes: dict[str, Quote], now: d
             lots = replay(trades, cfg.currencies)[cur.code]
             target = sell_target(lots[-1], cur, cfg.strategy)
             return (f"매수 기록 완료: {label(cur)} {amount:,.2f} @ {fx(rate, cur)} (원가 {won(lots[-1].cost(cur))})\n"
-                    f"매도 목표 환율: {fx(target, cur)} 이상")
+                    f"매도 목표 환율: {fx(target, cur)} 초과")
         try:
             result = preview_sell(trades, trade, cfg.currencies)
         except LedgerError as e:
