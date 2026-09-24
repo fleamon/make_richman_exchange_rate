@@ -3,6 +3,7 @@
 환율은 토스 앱과 같은 단위로 주고받는다 (엔·루피아·동은 100 단위).
 """
 
+import math
 from datetime import datetime
 
 from .config import Config, Currency
@@ -46,7 +47,7 @@ def label(cur: Currency) -> str:
 
 def _num(s: str) -> float:
     v = float(s.replace(",", ""))
-    if v <= 0:
+    if not math.isfinite(v) or v <= 0:
         raise ValueError
     return v
 

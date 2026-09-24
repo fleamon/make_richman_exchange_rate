@@ -96,6 +96,8 @@ def test_bot_commands_use_toss_units():
     assert "마지막 기록 삭제" in bot.handle("취소", st, CFG, {}, NOW)
     assert len(st["trades"]) == 1
     assert "형식" in bot.handle("매수 XXX 1 1", st, CFG, {}, NOW)
+    assert "숫자" in bot.handle("매수 USD nan 1", st, CFG, {}, NOW)
+    assert "숫자" in bot.handle("매수 USD 1300 inf", st, CFG, {}, NOW)
 
 
 def test_state_roundtrip(tmp_path, monkeypatch):
@@ -105,3 +107,6 @@ def test_state_roundtrip(tmp_path, monkeypatch):
     state.save(st, path)
     assert b"USD" not in path.read_bytes()
     assert state.load(path) == st
+    size = path.stat().st_size
+    state.save({**st, "trades": st["trades"] * 5}, path)
+    assert path.stat().st_size == size  # 거래가 늘어도 파일 크기로 드러나지 않음

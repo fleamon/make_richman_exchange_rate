@@ -10,6 +10,10 @@ import requests
 API = "https://api.telegram.org/bot{token}/{method}"
 
 
+class TelegramError(Exception):
+    pass
+
+
 class Telegram:
     def __init__(self, token: str, chat_id: str):
         self.token = token
@@ -21,8 +25,13 @@ class Telegram:
         return cls(token, chat_id) if token and chat_id else None
 
     def _call(self, method: str, **params) -> dict:
-        r = requests.post(API.format(token=self.token, method=method), json=params, timeout=20)
-        r.raise_for_status()
+        # 요청 URL 에 토큰이 들어가므로, 오류 메시지에 URL 이 섞여 공개 로그에 찍히지 않게 한다
+        try:
+            r = requests.post(API.format(token=self.token, method=method), json=params, timeout=20)
+        except requests.RequestException as e:
+            raise TelegramError(f"{method}: {type(e).__name__}") from None
+        if not r.ok:
+            raise TelegramError(f"{method}: HTTP {r.status_code}")
         return r.json()["result"]
 
     def send(self, text: str) -> None:

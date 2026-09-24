@@ -12,6 +12,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from .config import ROOT
 
 STATE_PATH = ROOT / "state" / "state.enc"
+PAD = 4096  # 암호문 길이로 거래 건수를 추정하지 못하게 평문을 이 단위로 채운다
 
 
 def empty() -> dict:
@@ -40,4 +41,6 @@ def load(path: Path = STATE_PATH) -> dict:
 
 def save(state: dict, path: Path = STATE_PATH) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(_fernet().encrypt(dumps(state).encode()))
+    raw = dumps(state).encode()
+    raw += b" " * (-len(raw) % PAD)
+    path.write_bytes(_fernet().encrypt(raw))

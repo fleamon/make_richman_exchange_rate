@@ -26,9 +26,6 @@ def run() -> None:
 
     quotes, errors = rates.fetch_all(cfg.currencies, cfg.strategy.lookback_days)
     print(f"환율 조회 {len(quotes)}/{len(cfg.currencies)}")
-    for e in errors:
-        print(f"  실패: {e}")
-
     if tg is None:
         print("TELEGRAM_TOKEN / TELEGRAM_CHAT_ID 가 없어 알림·명령 처리를 건너뜁니다.")
     else:
@@ -46,11 +43,11 @@ def run() -> None:
         elif not last_err or now - datetime.fromisoformat(last_err["ts"]) >= timedelta(hours=cfg.strategy.realert_hours):
             st["alerts"]["error:fetch"] = {"ts": now.isoformat(), "price": 0}
             tg.send("⚠️ 환율 조회 실패\n" + "\n".join(errors))
-        print(f"명령 {len(texts)}건 처리, 알림 {len(signals)}건 발송")
 
+    # 공개 로그라 명령·알림 건수나 상태 변경 여부도 남기지 않는다 (거래 활동 추정 방지)
     if state.dumps(st) != before:
         state.save(st)
-        print("상태 변경 → state.enc 갱신")
+    print("완료")
 
 
 def main() -> None:
