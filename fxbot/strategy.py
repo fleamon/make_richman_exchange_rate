@@ -21,7 +21,7 @@ class Signal:
     percentile: float
     low: float
     high: float
-    amount: float           # 권장 수량(매수) / 팔 수 있는 수량(매도)
+    amount: float = 0.0     # 매도 시 팔 수 있는 수량
     profit: float = 0.0     # 매도 시 예상 이익 (원)
 
     @property
@@ -51,7 +51,7 @@ def evaluate(q: Quote, cur: Currency, lots: list[Lot], s: Strategy) -> list[Sign
 
     if pct <= s.buy_percentile and len(lots) < s.max_lots:
         if not lots or q.price <= min(l.rate for l in lots) * (1 - s.add_step_pct / 100):
-            signals.append(Signal("buy", amount=s.lot_krw / (q.price * (1 + cur.buy_fee)), **base))
+            signals.append(Signal("buy", **base))
     return signals
 
 

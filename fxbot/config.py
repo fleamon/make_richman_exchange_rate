@@ -23,7 +23,6 @@ class Strategy:
     add_step_pct: float = 1.5
     max_lots: int = 3
     min_profit_pct: float = 1.0
-    lot_krw: int = 1_000_000
     realert_hours: float = 12
     realert_move_pct: float = 0.5
 
