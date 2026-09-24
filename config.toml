@@ -1,0 +1,39 @@
+# 환율 모니터링 설정 — 이 파일은 공개 저장소에 올라가므로 개인 정보(보유량·금액)를 적지 않는다.
+
+[strategy]
+lookback_days = 90          # 최근 몇 일의 환율과 비교할지 (약 3개월)
+buy_percentile = 20         # 현재 환율이 기간 내 하위 몇 % 이하이면 매수 신호
+add_step_pct = 1.5          # 이미 보유 중이면, 가장 싸게 산 환율보다 이만큼(%) 더 내려야 추가 매수 신호
+max_lots = 3                # 통화별 최대 분할 매수 횟수
+min_profit_pct = 1.0        # 수수료 차감 후에도 이만큼(%) 이상 이익일 때만 매도 신호
+lot_krw = 1_000_000         # 매수 신호 1회당 권장 매수 금액 (원)
+realert_hours = 12          # 같은 신호를 다시 알리는 최소 간격
+realert_move_pct = 0.5      # 이 간격 전이라도 환율이 이만큼(%) 더 유리해지면 다시 알림
+
+[fees]
+# 토스뱅크 외화통장은 살 때·팔 때 모두 환율우대 100% (수수료 0%).
+# 다른 곳을 쓰게 되면 %로 적는다. 통화별로 다르면 [fees.JPY] 처럼 덮어쓸 수 있다.
+buy_pct = 0.0
+sell_pct = 0.0
+
+# 토스뱅크 외화통장 지원 17개 통화.
+# unit: 토스 앱에 표시되는 환율 기준 단위 (엔·루피아·동은 100 단위)
+# via_usd: 원화 직접 시세가 부실한 통화는 달러 교차환율로 계산
+[currencies]
+USD = { name = "미국 달러" }
+EUR = { name = "유로" }
+JPY = { name = "일본 엔", unit = 100 }
+GBP = { name = "영국 파운드" }
+CAD = { name = "캐나다 달러" }
+AUD = { name = "호주 달러" }
+NZD = { name = "뉴질랜드 달러" }
+SGD = { name = "싱가포르 달러" }
+HKD = { name = "홍콩 달러" }
+CNY = { name = "중국 위안", via_usd = true }
+CHF = { name = "스위스 프랑" }
+MYR = { name = "말레이시아 링깃" }
+PHP = { name = "필리핀 페소", via_usd = true }
+IDR = { name = "인도네시아 루피아", unit = 100 }
+THB = { name = "태국 바트" }
+VND = { name = "베트남 동", unit = 100, via_usd = true }
+TWD = { name = "대만 달러" }

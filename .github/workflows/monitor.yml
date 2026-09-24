@@ -1,0 +1,49 @@
+name: fx-monitor
+
+on:
+  schedule:
+    - cron: "17 * * * *"   # 매시 17분 (정각은 GitHub 스케줄 지연이 커서 피함)
+  workflow_dispatch:        # 텔레그램 기록을 바로 반영하고 싶을 때 수동 실행
+
+permissions:
+  contents: write           # 암호화 상태 파일 커밋
+  actions: write            # 60일 무활동 시 스케줄 자동 비활성화 방지
+
+concurrency:
+  group: fx-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -q -r requirements.txt
+
+      - name: Monitor
+        env:
+          STATE_KEY: ${{ secrets.STATE_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m fxbot run
+
+      - name: Commit state
+        run: |
+          git add -A state
+          git diff --cached --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -m "chore: update encrypted state"
+          git pull -q --rebase && git push -q
+
+      - name: Keep schedule alive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/monitor.yml/enable"
