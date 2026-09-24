@@ -16,18 +16,17 @@ HELP = """사용법 (환율은 토스 앱 표시 그대로, 수량은 외화 금
 매도 JPY 905.2 100000  — 100엔당 905.2원에 10만엔 팔았음
 매도 JPY 905.2 전량    — 100엔당 905.2원에 가진 엔화 전부 팔았음
 매도 JPY 전량매도      — 가진 엔화 전부 팔았음 (환율은 봇 처리 시점 시장 환율)
-현황   — 보유 외화, 본전·목표 환율, 평가손익
+현황   — 보유 외화별 수량, 평균 매수 환율, 원가, 평가손익
 환율   — 전체 통화 현재 환율과 3개월 위치
-기록   — 보유 외화별 평균 매수 환율
 취소   — 마지막 거래 기록 삭제
-(/buy /sell /status /rates /history /undo 도 가능)"""
+(/buy /sell /status /rates /undo 도 가능)"""
 
 ALIASES = {
     "매수": "buy", "buy": "buy",
     "매도": "sell", "sell": "sell",
     "현황": "status", "status": "status",
     "환율": "rates", "rates": "rates",
-    "기록": "history", "history": "history",
+    "기록": "status", "history": "status",
     "취소": "undo", "undo": "undo",
     "도움말": "help", "help": "help", "start": "help",
 }
@@ -104,10 +103,7 @@ def handle(text: str, state: dict, cfg: Config, quotes: dict[str, Quote], now: d
         cur = cfg.currencies[t["code"]]
         return f"마지막 기록 삭제: {'매수' if t['side'] == 'buy' else '매도'} {t['code']} {t['amount']:,.2f} @ {fx(t['rate'], cur)}"
 
-    if cmd == "history":
-        return history_text(state, cfg)
-
-    if cmd == "status":
+    if cmd == "status":  # '기록' 도 같은 답을 준다
         return status_text(state, cfg, quotes)
 
     if cmd == "rates":
@@ -124,28 +120,13 @@ def status_text(state: dict, cfg: Config, quotes: dict[str, Quote]) -> str:
     for code, ls in lots.items():
         cur, q = cfg.currencies[code], quotes.get(code)
         amount, cost = sum(l.amount for l in ls), sum(l.cost(cur) for l in ls)
-        head = f"\n{label(cur)} {amount:,.2f} / 원가 {won(cost)}"
+        avg = sum(l.rate * l.amount for l in ls) / amount
+        lines.append(f"\n{label(cur)} {amount:,.2f}\n  평균 {fx(avg, cur)} ({len(ls)}회 매수) / 원가 {won(cost)}")
         if q:
             pnl = amount * q.price * (1 - cur.sell_fee) - cost
             total += pnl
-            head += f"\n  현재 {fx(q.price, cur)} → 평가손익 {won(pnl)}"
-        lines.append(head)
-        for l in ls:
-            lines.append(f"  · {l.amount:,.2f} @ {fx(l.rate, cur)} → 목표 {fx(sell_target(l, cur, cfg.strategy), cur)}")
+            lines.append(f"  현재 {fx(q.price, cur)} → 평가손익 {won(pnl)}")
     lines.append(f"\n총 평가손익 {won(total)}")
-    return "\n".join(lines)
-
-
-def history_text(state: dict, cfg: Config) -> str:
-    lots = replay(state["trades"], cfg.currencies)
-    if not lots:
-        return "보유 중인 외화가 없습니다."
-    lines = ["보유 외화 평균 매수 환율"]
-    for code, ls in lots.items():
-        cur = cfg.currencies[code]
-        amount = sum(l.amount for l in ls)
-        avg = sum(l.rate * l.amount for l in ls) / amount
-        lines.append(f"{label(cur)} {amount:,.2f} / 평균 {fx(avg, cur)} ({len(ls)}회 매수, 원가 {won(sum(l.cost(cur) for l in ls))})")
     return "\n".join(lines)
 
 
