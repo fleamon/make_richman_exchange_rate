@@ -2,9 +2,10 @@ name: fx-monitor
 
 on:
   schedule:
-    # 매시 7분·37분. 붐비는 정각을 피하고, GitHub 이 한 번 건너뛰어도 30분 뒤 실행이 대신한다
+    # GitHub 예약 실행은 자주 빠진다. 주 실행은 Cloudflare Worker(matmap-social-cron)가
+    # 매시 10분·40분에 workflow_dispatch 로 부르고, 이 예약은 그게 멈췄을 때의 예비다.
     - cron: "7,37 * * * *"
-  workflow_dispatch:        # 텔레그램 기록을 바로 반영하고 싶을 때 수동 실행
+  workflow_dispatch:        # Cloudflare Worker 호출, 또는 텔레그램 기록을 바로 반영하고 싶을 때 수동 실행
 
 permissions:
   contents: write           # 암호화 상태 파일 커밋 (매시간 커밋되므로 60일 무활동 자동 비활성화도 걸리지 않는다)
