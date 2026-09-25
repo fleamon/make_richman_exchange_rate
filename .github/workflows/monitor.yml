@@ -7,8 +7,7 @@ on:
   workflow_dispatch:        # 텔레그램 기록을 바로 반영하고 싶을 때 수동 실행
 
 permissions:
-  contents: write           # 암호화 상태 파일 커밋
-  actions: write            # 60일 무활동 시 스케줄 자동 비활성화 방지
+  contents: write           # 암호화 상태 파일 커밋 (매시간 커밋되므로 60일 무활동 자동 비활성화도 걸리지 않는다)
 
 concurrency:
   group: fx-monitor
@@ -44,7 +43,3 @@ jobs:
           git commit -q -m "chore: update encrypted state"
           git pull -q --rebase && git push -q
 
-      - name: Keep schedule alive
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/monitor.yml/enable"
