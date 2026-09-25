@@ -139,3 +139,10 @@ def test_sell_all():
     bot.handle("매수 USD 1300 10", st, CFG, {}, NOW)
     assert "10.00 @ 1,310.00" in bot.handle("매도 USD 1310 전량", st, CFG, {}, NOW)
     assert "숫자" in bot.handle("매수 USD 1300 전량", st, CFG, {}, NOW)
+
+
+def test_signal_slot_is_hourly_kst():
+    base = datetime(2026, 9, 25, 3, 7, tzinfo=timezone.utc)  # 한국 12:07
+    assert strategy.signal_slot(base) == strategy.signal_slot(base + timedelta(minutes=30))
+    assert strategy.signal_slot(base) != strategy.signal_slot(base + timedelta(minutes=60))
+    assert strategy.signal_slot(base) == "2026-09-25T12"

@@ -2,7 +2,8 @@ name: fx-monitor
 
 on:
   schedule:
-    - cron: "0 * * * *"    # 매시 정각 (GitHub 사정으로 수~수십 분 늦게 시작될 수 있음)
+    # 매시 7분·37분. 붐비는 정각을 피하고, GitHub 이 한 번 건너뛰어도 30분 뒤 실행이 대신한다
+    - cron: "7,37 * * * *"
   workflow_dispatch:        # 텔레그램 기록을 바로 반영하고 싶을 때 수동 실행
 
 permissions:

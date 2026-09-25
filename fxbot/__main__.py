@@ -36,8 +36,11 @@ def run() -> None:
         if state.dumps(st) != before:
             state.save(st)
 
-        for sig in strategy.run(cfg, quotes, replay(st["trades"], cfg.currencies)):
-            tg.send(signal_text(sig, cfg.currencies[sig.code], cfg))
+        slot = strategy.signal_slot(now)
+        if st.get("signal_slot") != slot:
+            for sig in strategy.run(cfg, quotes, replay(st["trades"], cfg.currencies)):
+                tg.send(signal_text(sig, cfg.currencies[sig.code], cfg))
+            st["signal_slot"] = slot
     st.pop("alerts", None)
 
     # 공개 로그라 명령·알림 건수나 상태 변경 여부도 남기지 않는다 (거래 활동 추정 방지)

@@ -6,6 +6,7 @@
 """
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 from .config import Config, Currency, Strategy
 from .ledger import Lot
@@ -58,3 +59,7 @@ def run(cfg: Config, quotes: dict[str, Quote], lots: dict[str, list[Lot]]) -> li
     """지금 조건에 맞는 신호 전부 (같은 신호도 매번 보낸다)."""
     return [sig for code, q in quotes.items() for sig in evaluate(q, cfg.currencies[code], lots.get(code, []), cfg.strategy)]
 
+
+def signal_slot(now: datetime) -> str:
+    """신호는 한국 시각 기준 1시간에 한 번만 보낸다. 같은 시간대의 두 번째 실행은 명령만 처리한다."""
+    return (now + timedelta(hours=9)).strftime("%Y-%m-%dT%H")
