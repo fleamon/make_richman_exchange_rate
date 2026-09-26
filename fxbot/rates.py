@@ -1,6 +1,7 @@
-"""Yahoo Finance 차트 API 로 원화 환율(시장 중간값)과 일별 종가 이력을 가져온다.
+"""원화 환율과 일별 종가 이력을 가져온다.
 
-토스뱅크는 환율우대 100% 라 매매기준율로 사고팔며, 매매기준율은 시장 중간값을 따라간다.
+토스뱅크는 환율우대 100% 라 매매기준율로 사고팔므로, 하나은행 매매기준율(네이버 금융 제공)을 우선 쓰고
+조회가 실패한 통화만 Yahoo Finance 시장 중간값으로 대신한다.
 """
 
 import time
@@ -13,6 +14,8 @@ from .config import Currency
 
 HOSTS = ("query1.finance.yahoo.com", "query2.finance.yahoo.com")
 HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)"}
+NAVER = "https://m.stock.naver.com/front-api/marketIndex"
+NAVER_PAGE = 60             # 네이버가 한 번에 주는 최대 일수
 MIN_POINTS = 30
 
 
@@ -55,6 +58,32 @@ def _chart(session: requests.Session, symbol: str) -> tuple[float, datetime, dic
     raise RateError(f"{symbol}: {last_err}")
 
 
+def _naver(session: requests.Session, cur: Currency, lookback_days: int) -> tuple[float, datetime, dict[date, float]]:
+    """하나은행 매매기준율. 네이버는 토스와 같은 표시 단위(엔·루피아·동은 100 단위)로 주므로 1단위당으로 되돌린다."""
+    code = f"FX_{cur.code}KRW"
+    num = lambda v: float(v.replace(",", "")) / cur.unit
+    try:
+        r = session.get(f"{NAVER}/productDetail", params={"category": "exchange", "reutersCode": code},
+                        headers=HEADERS, timeout=15)
+        r.raise_for_status()
+        res = r.json()["result"]
+        price = num(res["closePrice"])
+        as_of = datetime.fromisoformat(res["localTradedAt"]).astimezone(timezone.utc)
+        series: dict[date, float] = {}
+        for page in range(1, lookback_days // NAVER_PAGE + 2):
+            r = session.get(f"{NAVER}/prices", params={"category": "exchange", "reutersCode": code,
+                                                       "page": page, "pageSize": NAVER_PAGE},
+                            headers=HEADERS, timeout=15)
+            r.raise_for_status()
+            rows = r.json()["result"]
+            series.update({date.fromisoformat(x["localTradedAt"]): num(x["closePrice"]) for x in rows})
+            if len(rows) < NAVER_PAGE:
+                break
+        return price, as_of, series
+    except (requests.RequestException, KeyError, IndexError, TypeError, ValueError) as e:
+        raise RateError(f"{cur.code}: 네이버 {type(e).__name__}") from None
+
+
 def _usd_cross(session: requests.Session, code: str, cache: dict):
     if "USDKRW=X" not in cache:
         cache["USDKRW=X"] = _chart(session, "USDKRW=X")
@@ -65,10 +94,13 @@ def _usd_cross(session: requests.Session, code: str, cache: dict):
 
 
 def fetch_quote(session: requests.Session, cur: Currency, lookback_days: int, cache: dict) -> Quote:
-    if cur.via_usd:
-        price, as_of, series = _usd_cross(session, cur.code, cache)
-    else:
-        price, as_of, series = _chart(session, f"{cur.code}KRW=X")
+    try:
+        price, as_of, series = _naver(session, cur, lookback_days)
+    except RateError:
+        if cur.via_usd:
+            price, as_of, series = _usd_cross(session, cur.code, cache)
+        else:
+            price, as_of, series = _chart(session, f"{cur.code}KRW=X")
     since = datetime.now(timezone.utc).date() - timedelta(days=lookback_days)
     history = [v for d, v in sorted(series.items()) if d >= since]
     if len(history) < MIN_POINTS:
