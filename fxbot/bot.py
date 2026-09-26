@@ -148,13 +148,9 @@ def header_text(now: datetime) -> str:
     return f"━━━━━━━━━━━━━━━\n📍 {kst:%m/%d %H:%M} 최신 신호\n(이 메시지 아래가 가장 최근 알림입니다)\n━━━━━━━━━━━━━━━"
 
 
-def buy_text(cfg: Config, quotes: dict[str, Quote], signals: list[Signal]) -> str:
-    """전 통화를 '30일 뒤 오를 확률' 높은 순으로 한 통에 (확률은 과거 백테스트 표, 같으면 하위 % 낮은 순).
-
-    🟢 는 매수 신호 조건(하위 buy_percentile% 이하 등)을 채운 통화, ⚪ 는 아직 아닌 통화.
-    """
+def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
+    """전 통화를 '30일 뒤 오를 확률' 높은 순으로 한 통에 (확률은 과거 백테스트 표, 같으면 하위 % 낮은 순)."""
     days = cfg.strategy.lookback_days
-    flagged = {s.code for s in signals if s.side == "buy"}
     table = odds.load()
     rank = {c: i for i, c in enumerate(PRIORITY)}
     rows = []
@@ -162,12 +158,12 @@ def buy_text(cfg: Config, quotes: dict[str, Quote], signals: list[Signal]) -> st
         pct = percentile(q.price, q.history)
         rows.append((odds.probability(table, q.code, pct), pct, q))
     rows.sort(key=lambda r: (-(r[0] or 0), round(r[1]), rank.get(r[2].code, len(rank))))
-    lines = [f"🟢 매수 신호 {len(flagged)}건 / 전체 {len(rows)}개 통화 (최근 {days}일 기준, 30일 뒤 오를 확률 높은 순)"]
+    lines = [f"🟢 매수 신호 · {len(rows)}개 통화 (최근 {days}일 기준, 30일 뒤 오를 확률 높은 순)"]
     for prob, pct, q in rows:
         cur = cfg.currencies[q.code]
         drop, span = q.price / max(q.history) - 1, (max(q.history) - min(q.history)) / q.price
         edge = odds.dip_edge(table, q.code)
-        lines.append(f"\n{'🟢' if q.code in flagged else '⚪'} {label(cur)} {fx(q.price, cur)}\n"
+        lines.append(f"\n{label(cur)} {fx(q.price, cur)}\n"
                      + (f"오를 확률 {prob:.0%}" if prob is not None else "확률 표 없음")
                      + f"\n하위 {pct:.0f}% · 고점 대비 {drop:+.1%}\n변동폭 {span:.0%}" + (f" · 저점 반등 {edge}" if edge else ""))
     lines.append("\n기록: '매수 통화 환율 수량'")

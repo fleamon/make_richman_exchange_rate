@@ -42,7 +42,7 @@ def run() -> None:
         if st.get("signal_slot") != slot or os.environ.get("FORCE_SIGNAL"):
             sigs = strategy.run(cfg, quotes, replay(st["trades"], cfg.currencies))
             # 구분선 역할의 시각 메시지 → 매수 신호 → 보유 현황 → 매도 신호 (각각 한 통)
-            for text in (header_text(now), buy_text(cfg, quotes, sigs),
+            for text in (header_text(now), buy_text(cfg, quotes),
                          status_text(st, cfg, quotes), signals_text("sell", sigs, cfg)):
                 tg.send(text)
             st["signal_slot"] = slot
