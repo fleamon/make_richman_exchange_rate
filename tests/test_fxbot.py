@@ -148,12 +148,12 @@ def test_signal_slot_is_hourly_kst():
     assert strategy.signal_slot(base) == "2026-09-25T12"
 
 
-def test_signals_text_sorted_by_priority_then_percentile():
+def test_signals_text_sorted_by_percentile_then_priority():
     from fxbot.bot import signals_text
     from fxbot.strategy import Signal
     cfg = config.load()
     mk = lambda c, p: Signal("buy", c, 0.001, p, 0.001, 0.002)
     text = signals_text("buy", [mk("VND", 1), mk("JPY", 4), mk("USD", 3), mk("EUR", 2)], cfg)
     order = [l.split()[1].split("(")[0] for l in text.splitlines()[1:5]]
-    assert order == ["USD", "EUR", "JPY", "VND"]
+    assert order == ["VND", "EUR", "USD", "JPY"]
     assert signals_text("sell", [], cfg) == "🔴 매도 신호 없음"

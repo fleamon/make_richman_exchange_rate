@@ -148,12 +148,12 @@ def header_text(now: datetime) -> str:
 
 
 def signals_text(side: str, signals: list[Signal], cfg: Config) -> str:
-    """같은 종류 신호를 메시지 하나로 정리. 오를 가능성 높은 통화 순, 같은 등급은 하위 % 오름차순."""
+    """같은 종류 신호를 메시지 하나로 정리. 하위 % 오름차순, 같은 %는 오를 가능성 높은 통화 순."""
     icon, name = ("🟢", "매수") if side == "buy" else ("🔴", "매도")
     sigs = sort_signals([s for s in signals if s.side == side])
     if not sigs:
         return f"{icon} {name} 신호 없음"
-    lines = [f"{icon} {name} 신호 {len(sigs)}건 (최근 {cfg.strategy.lookback_days}일 하위 %, 위쪽일수록 상승 가능성 높음)"]
+    lines = [f"{icon} {name} 신호 {len(sigs)}건 (최근 {cfg.strategy.lookback_days}일 하위 % 낮은 순, 같으면 상승 가능성 높은 순)"]
     for n, sig in enumerate(sigs, 1):
         cur = cfg.currencies[sig.code]
         line = f"{n}. {label(cur)} {fx(sig.price, cur)} · 하위 {sig.percentile:.0f}% [{fx(sig.low, cur)}~{fx(sig.high, cur)}]"

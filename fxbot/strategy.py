@@ -35,9 +35,9 @@ PRIORITY = ("USD", "EUR", "JPY", "GBP", "CHF", "CAD", "AUD", "SGD", "HKD", "NZD"
 
 
 def sort_signals(signals: list[Signal]) -> list[Signal]:
-    """오를 가능성 높은 통화 순, 같은 등급 안에서는 하위 퍼센트 오름차순."""
+    """하위 퍼센트(표시되는 정수 %) 오름차순, 같은 %끼리는 오를 가능성 높은 통화 순."""
     rank = {c: i for i, c in enumerate(PRIORITY)}
-    return sorted(signals, key=lambda s: (rank.get(s.code, len(rank)), s.percentile))
+    return sorted(signals, key=lambda s: (round(s.percentile), rank.get(s.code, len(rank))))
 
 
 def percentile(price: float, history: list[float]) -> float:
