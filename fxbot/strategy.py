@@ -41,8 +41,9 @@ def sort_signals(signals: list[Signal]) -> list[Signal]:
 
 
 def percentile(price: float, history: list[float]) -> float:
-    """history 중 price 이하인 비율 (0~100)."""
-    return 100 * sum(1 for h in history if h <= price) / len(history)
+    """history 중 price 보다 낮은 값의 비율 (0~100). 기간 최저면 0%."""
+    # 야후 종가는 float32 오차가 있어 같은 값이 미세하게 다르게 온다 → 0.0001% 이내는 같은 값으로 본다
+    return 100 * sum(1 for h in history if h < price * (1 - 1e-6)) / len(history)
 
 
 def sell_target(lot: Lot, cur: Currency, s: Strategy) -> float:
