@@ -29,6 +29,17 @@ class Signal:
         return f"{self.side}:{self.code}"
 
 
+# 앞으로 오를 가능성이 높다고 보는 순서 (기축·안전통화 → 선진국 → 신흥국)
+PRIORITY = ("USD", "EUR", "JPY", "GBP", "CHF", "CAD", "AUD", "SGD", "HKD", "NZD",
+            "CNY", "TWD", "MYR", "THB", "PHP", "IDR", "VND")
+
+
+def sort_signals(signals: list[Signal]) -> list[Signal]:
+    """오를 가능성 높은 통화 순, 같은 등급 안에서는 하위 퍼센트 오름차순."""
+    rank = {c: i for i, c in enumerate(PRIORITY)}
+    return sorted(signals, key=lambda s: (rank.get(s.code, len(rank)), s.percentile))
+
+
 def percentile(price: float, history: list[float]) -> float:
     """history 중 price 이하인 비율 (0~100)."""
     return 100 * sum(1 for h in history if h <= price) / len(history)

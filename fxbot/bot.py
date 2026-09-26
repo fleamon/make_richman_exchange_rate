@@ -4,12 +4,12 @@
 """
 
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .config import Config, Currency
 from .ledger import LedgerError, preview_sell, replay
 from .rates import Quote
-from .strategy import Signal, percentile, sell_target
+from .strategy import Signal, percentile, sell_target, sort_signals
 
 HELP = """사용법 (환율은 토스 앱 표시 그대로, 수량은 외화 금액)
 매수 USD 1350.5 1000   — 1,350.5원에 1,000달러 샀음
@@ -139,6 +139,28 @@ def rates_text(cfg: Config, quotes: dict[str, Quote]) -> str:
                          f"[{fx(min(q.history), cur)} ~ {fx(max(q.history), cur)}]")
         else:
             lines.append(f"{label(cur)} 조회 실패")
+    return "\n".join(lines)
+
+
+def header_text(now: datetime) -> str:
+    kst = now + timedelta(hours=9)
+    return f"━━━━━━━━━━━━━━━\n📍 {kst:%m/%d %H:%M} 최신 신호\n(이 메시지 아래가 가장 최근 알림입니다)\n━━━━━━━━━━━━━━━"
+
+
+def signals_text(side: str, signals: list[Signal], cfg: Config) -> str:
+    """같은 종류 신호를 메시지 하나로 정리. 오를 가능성 높은 통화 순, 같은 등급은 하위 % 오름차순."""
+    icon, name = ("🟢", "매수") if side == "buy" else ("🔴", "매도")
+    sigs = sort_signals([s for s in signals if s.side == side])
+    if not sigs:
+        return f"{icon} {name} 신호 없음"
+    lines = [f"{icon} {name} 신호 {len(sigs)}건 (최근 {cfg.strategy.lookback_days}일 하위 %, 위쪽일수록 상승 가능성 높음)"]
+    for n, sig in enumerate(sigs, 1):
+        cur = cfg.currencies[sig.code]
+        line = f"{n}. {label(cur)} {fx(sig.price, cur)} · 하위 {sig.percentile:.0f}% [{fx(sig.low, cur)}~{fx(sig.high, cur)}]"
+        if side == "sell":
+            line += f" · 예상 이익 {won(sig.profit)}"
+        lines.append(line)
+    lines.append(f"기록: '{name} 통화 환율 수량'")
     return "\n".join(lines)
 
 
