@@ -158,8 +158,8 @@ def test_buy_text_sorted_by_odds_then_percentile(monkeypatch):
     hist = [100.0 + i for i in range(60)]
     mk = lambda c, p: Quote(c, p, hist, NOW)
     quotes = {"USD": mk("USD", 100), "EUR": mk("EUR", 100), "JPY": mk("JPY", 100), "GBP": mk("GBP", 159)}
-    lines = buy_text(cfg, quotes, []).splitlines()[1:5]
-    assert [l.split()[2].split("(")[0] for l in lines] == ["EUR", "JPY", "GBP", "USD"]  # 70% > 50%(JPY 하위0%) > 50%(GBP 하위98%) > 40%
+    lines = [l for l in buy_text(cfg, quotes, []).splitlines()[1:] if l.startswith(("🟢", "⚪"))]
+    assert [l.split()[1].split("(")[0] for l in lines] == ["EUR", "JPY", "GBP", "USD"]  # 70% > 50%(JPY 하위0%) > 50%(GBP 하위98%) > 40%
 
 
 def test_probability_shrinks_toward_pooled():

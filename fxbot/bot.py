@@ -163,13 +163,13 @@ def buy_text(cfg: Config, quotes: dict[str, Quote], signals: list[Signal]) -> st
         rows.append((odds.probability(table, q.code, pct), pct, q))
     rows.sort(key=lambda r: (-(r[0] or 0), round(r[1]), rank.get(r[2].code, len(rank))))
     lines = [f"🟢 매수 신호 {len(flagged)}건 / 전체 {len(rows)}개 통화 (최근 {days}일 기준, 30일 뒤 오를 확률 높은 순)"]
-    for n, (prob, pct, q) in enumerate(rows, 1):
+    for prob, pct, q in rows:
         cur = cfg.currencies[q.code]
         drop, span = q.price / max(q.history) - 1, (max(q.history) - min(q.history)) / q.price
-        chance = f"오를 확률 {prob:.0%}" if prob is not None else "확률 표 없음"
         edge = odds.dip_edge(table, q.code)
-        lines.append(f"{n}. {'🟢' if q.code in flagged else '⚪'} {label(cur)} {fx(q.price, cur)} · {chance} · 하위 {pct:.0f}% · "
-                     f"고점 대비 {drop:+.1%} · 변동폭 {span:.0%}" + (f" · 저점 반등 {edge}" if edge else ""))
+        lines.append(f"\n{'🟢' if q.code in flagged else '⚪'} {label(cur)} {fx(q.price, cur)}\n"
+                     + (f"오를 확률 {prob:.0%}" if prob is not None else "확률 표 없음")
+                     + f"\n하위 {pct:.0f}% · 고점 대비 {drop:+.1%}\n변동폭 {span:.0%}" + (f" · 저점 반등 {edge}" if edge else ""))
     lines.append(f"\n※ 기준: 최근 {days}일 중 하위 %별로, 과거 10년 동안 30일 뒤 오른 비율(통화별)입니다. "
                  "하위 5~20% 구간이 가장 잘 올랐고 가장 바닥(0~5%)은 그보다 낮았습니다. "
                  "'저점 반등'은 이 통화가 하위 10% 이하에서 과거에 오른 비율(강함 60%↑ / 약함 52%↓)입니다. "
