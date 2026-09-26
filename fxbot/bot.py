@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from .config import Config, Currency
 from .ledger import LedgerError, preview_sell, replay
 from .rates import Quote
-from .strategy import Signal, percentile, sell_target, sort_signals
+from .strategy import PRIORITY, Signal, outlook, percentile, sell_target, sort_signals
 
 HELP = """사용법 (환율은 토스 앱 표시 그대로, 수량은 외화 금액)
 매수 USD 1350.5 1000   — 1,350.5원에 1,000달러 샀음
@@ -147,20 +147,37 @@ def header_text(now: datetime) -> str:
     return f"━━━━━━━━━━━━━━━\n📍 {kst:%m/%d %H:%M} 최신 신호\n(이 메시지 아래가 가장 최근 알림입니다)\n━━━━━━━━━━━━━━━"
 
 
+def buy_text(cfg: Config, quotes: dict[str, Quote], signals: list[Signal]) -> str:
+    """전 통화를 하위 % 오름차순으로 한 통에. 같은 %는 상승 가능성 점수 높은 순, 그다음 고정 우선순위.
+
+    🟢 는 매수 신호 조건(하위 buy_percentile% 이하 등)을 채운 통화, ⚪ 는 아직 아닌 통화.
+    """
+    days = cfg.strategy.lookback_days
+    flagged = {s.code for s in signals if s.side == "buy"}
+    rank = {c: i for i, c in enumerate(PRIORITY)}
+    rows = sorted(((percentile(q.price, q.history), outlook(q), q) for q in quotes.values()),
+                  key=lambda r: (round(r[0]), -r[1].score, rank.get(r[2].code, len(rank))))
+    lines = [f"🟢 매수 신호 {len(flagged)}건 / 전체 {len(rows)}개 통화 (최근 {days}일, 하위 % 낮은 순 → 상승 가능성 높은 순)"]
+    for n, (pct, o, q) in enumerate(rows, 1):
+        cur = cfg.currencies[q.code]
+        drop, span = q.price / max(q.history) - 1, (max(q.history) - min(q.history)) / q.price
+        lines.append(f"{n}. {'🟢' if q.code in flagged else '⚪'} {label(cur)} {fx(q.price, cur)} · 하위 {pct:.0f}% · "
+                     f"고점 대비 {drop:+.1%} · 변동폭 {span:.0%} · 상승 가능성 {o.grade}({', '.join(o.tags)})")
+    lines.append("기록: '매수 통화 환율 수량'")
+    return "\n".join(lines)
+
+
 def signals_text(side: str, signals: list[Signal], cfg: Config) -> str:
-    """같은 종류 신호를 메시지 하나로 정리. 하위 % 오름차순, 같은 %는 오를 가능성 높은 통화 순."""
-    icon, name = ("🟢", "매수") if side == "buy" else ("🔴", "매도")
+    """매도 신호를 메시지 하나로 정리. 하위 % 오름차순, 같은 %는 오를 가능성 높은 통화 순."""
     sigs = sort_signals([s for s in signals if s.side == side])
     if not sigs:
-        return f"{icon} {name} 신호 없음"
-    lines = [f"{icon} {name} 신호 {len(sigs)}건 (최근 {cfg.strategy.lookback_days}일 하위 % 낮은 순, 같으면 상승 가능성 높은 순)"]
+        return "🔴 매도 신호 없음"
+    lines = [f"🔴 매도 신호 {len(sigs)}건 (최근 {cfg.strategy.lookback_days}일 하위 % 낮은 순)"]
     for n, sig in enumerate(sigs, 1):
         cur = cfg.currencies[sig.code]
-        line = f"{n}. {label(cur)} {fx(sig.price, cur)} · 하위 {sig.percentile:.0f}% [{fx(sig.low, cur)}~{fx(sig.high, cur)}]"
-        if side == "sell":
-            line += f" · 예상 이익 {won(sig.profit)}"
-        lines.append(line)
-    lines.append(f"기록: '{name} 통화 환율 수량'")
+        lines.append(f"{n}. {label(cur)} {fx(sig.price, cur)} · 하위 {sig.percentile:.0f}% "
+                     f"[{fx(sig.low, cur)}~{fx(sig.high, cur)}] · 예상 이익 {won(sig.profit)}")
+    lines.append("기록: '매도 통화 환율 수량'")
     return "\n".join(lines)
 
 

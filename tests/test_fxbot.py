@@ -148,12 +148,20 @@ def test_signal_slot_is_hourly_kst():
     assert strategy.signal_slot(base) == "2026-09-25T12"
 
 
-def test_signals_text_sorted_by_percentile_then_priority():
-    from fxbot.bot import signals_text
-    from fxbot.strategy import Signal
+def test_buy_text_lists_all_currencies_by_percentile():
+    from fxbot.bot import buy_text
     cfg = config.load()
-    mk = lambda c, p: Signal("buy", c, 0.001, p, 0.001, 0.002)
-    text = signals_text("buy", [mk("VND", 1), mk("JPY", 4), mk("USD", 3), mk("EUR", 2)], cfg)
-    order = [l.split()[1].split("(")[0] for l in text.splitlines()[1:5]]
-    assert order == ["VND", "EUR", "USD", "JPY"]
-    assert signals_text("sell", [], cfg) == "🔴 매도 신호 없음"
+    flat = [100.0 + i for i in range(60)]
+    mk = lambda c, p: Quote(c, p, flat, NOW)
+    quotes = {"VND": mk("VND", 100), "USD": mk("USD", 100), "EUR": mk("EUR", 159), "JPY": mk("JPY", 130)}
+    lines = buy_text(cfg, quotes, []).splitlines()[1:5]
+    assert [l.split()[2].split("(")[0] for l in lines] == ["USD", "VND", "JPY", "EUR"]  # 같은 0% 는 우선순위(USD>VND)
+    assert all("⚪" in l for l in lines)
+
+
+def test_outlook_penalizes_crash_and_rewards_rebound():
+    from fxbot.strategy import outlook
+    falling = Quote("USD", 80.0, [100.0] * 50 + [95, 92, 90, 88, 85, 84], NOW)
+    rebound = Quote("USD", 95.0, [100.0] * 50 + [90, 90, 91, 92, 93, 94], NOW)
+    assert outlook(falling).grade == "낮음" and "급락" in outlook(falling).tags
+    assert outlook(rebound).grade in ("보통", "높음") and "반등" in outlook(rebound).tags

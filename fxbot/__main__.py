@@ -12,7 +12,7 @@ import sys
 from datetime import datetime, timezone
 
 from . import config, rates, state, strategy
-from .bot import handle, header_text, rates_text, signals_text, status_text
+from .bot import buy_text, handle, header_text, rates_text, signals_text, status_text
 from .ledger import replay
 from .telegram import Telegram
 
@@ -40,7 +40,7 @@ def run() -> None:
         if st.get("signal_slot") != slot:
             sigs = strategy.run(cfg, quotes, replay(st["trades"], cfg.currencies))
             # 구분선 역할의 시각 메시지 → 매수 신호 → 보유 현황 → 매도 신호 (각각 한 통)
-            for text in (header_text(now), signals_text("buy", sigs, cfg),
+            for text in (header_text(now), buy_text(cfg, quotes, sigs),
                          status_text(st, cfg, quotes), signals_text("sell", sigs, cfg)):
                 tg.send(text)
             st["signal_slot"] = slot
