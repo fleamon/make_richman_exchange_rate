@@ -6,6 +6,11 @@ on:
     # 매시 10분·40분에 workflow_dispatch 로 부르고, 이 예약은 그게 멈췄을 때의 예비다.
     - cron: "7,37 * * * *"
   workflow_dispatch:        # Cloudflare Worker 호출, 또는 텔레그램 기록을 바로 반영하고 싶을 때 수동 실행
+    inputs:
+      force_signal:
+        description: "이번 시간대에 이미 보냈어도 신호 메시지를 다시 보낸다 (테스트용)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write           # 암호화 상태 파일 커밋 (매시간 커밋되므로 60일 무활동 자동 비활성화도 걸리지 않는다)
@@ -33,6 +38,7 @@ jobs:
           STATE_KEY: ${{ secrets.STATE_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          FORCE_SIGNAL: ${{ inputs.force_signal && '1' || '' }}
         run: python -m fxbot run
 
       - name: Commit state

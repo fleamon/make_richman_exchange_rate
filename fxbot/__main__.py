@@ -9,6 +9,7 @@ rates  : 현재 환율과 3개월 위치를 화면에 출력 (로컬 확인용)
 공개 저장소의 Actions 로그는 누구나 볼 수 있으므로, run 은 보유·거래 정보를 로그에 출력하지 않는다.
 """
 
+import os
 import sys
 from datetime import datetime, timezone
 
@@ -38,7 +39,7 @@ def run() -> None:
             state.save(st)
 
         slot = strategy.signal_slot(now)
-        if st.get("signal_slot") != slot:
+        if st.get("signal_slot") != slot or os.environ.get("FORCE_SIGNAL"):
             sigs = strategy.run(cfg, quotes, replay(st["trades"], cfg.currencies))
             # 구분선 역할의 시각 메시지 → 매수 신호 → 보유 현황 → 매도 신호 (각각 한 통)
             for text in (header_text(now), buy_text(cfg, quotes, sigs),
