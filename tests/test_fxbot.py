@@ -148,20 +148,24 @@ def test_signal_slot_is_hourly_kst():
     assert strategy.signal_slot(base) == "2026-09-25T12"
 
 
-def test_buy_text_lists_all_currencies_by_percentile():
+def test_buy_text_sorted_by_odds_then_percentile(monkeypatch):
+    from fxbot import odds
     from fxbot.bot import buy_text
     cfg = config.load()
-    flat = [100.0 + i for i in range(60)]
-    mk = lambda c, p: Quote(c, p, flat, NOW)
-    quotes = {"VND": mk("VND", 100), "USD": mk("USD", 100), "EUR": mk("EUR", 159), "JPY": mk("JPY", 130)}
+    table = {"pooled": {str(b): [0.5, 1000] for b in range(5)},
+             "currency": {"EUR": {"0": [0.7, 100000]}, "USD": {"0": [0.4, 100000]}}}
+    monkeypatch.setattr(odds, "load", lambda: table)
+    hist = [100.0 + i for i in range(60)]
+    mk = lambda c, p: Quote(c, p, hist, NOW)
+    quotes = {"USD": mk("USD", 100), "EUR": mk("EUR", 100), "JPY": mk("JPY", 100), "GBP": mk("GBP", 159)}
     lines = buy_text(cfg, quotes, []).splitlines()[1:5]
-    assert [l.split()[2].split("(")[0] for l in lines] == ["USD", "VND", "JPY", "EUR"]  # 같은 0% 는 우선순위(USD>VND)
-    assert all("⚪" in l for l in lines)
+    assert [l.split()[2].split("(")[0] for l in lines] == ["EUR", "JPY", "GBP", "USD"]  # 70% > 50%(JPY 하위0%) > 50%(GBP 하위98%) > 40%
 
 
-def test_outlook_penalizes_crash_and_rewards_rebound():
-    from fxbot.strategy import outlook
-    falling = Quote("USD", 80.0, [100.0] * 50 + [95, 92, 90, 88, 85, 84], NOW)
-    rebound = Quote("USD", 95.0, [100.0] * 50 + [90, 90, 91, 92, 93, 94], NOW)
-    assert outlook(falling).grade == "낮음" and "급락" in outlook(falling).tags
-    assert outlook(rebound).grade in ("보통", "높음") and "반등" in outlook(rebound).tags
+def test_probability_shrinks_toward_pooled():
+    from fxbot import odds
+    table = {"pooled": {"0": [0.5, 1000]}, "currency": {"X": {"0": [0.9, 400]}, "Y": {"0": [0.9, 4]}}}
+    assert abs(odds.probability(table, "X", 0) - 0.7) < 1e-9
+    assert abs(odds.probability(table, "Y", 0) - 0.5) < 0.01
+    assert odds.probability(table, "Z", 0) == 0.5
+    assert odds.probability({}, "X", 0) is None

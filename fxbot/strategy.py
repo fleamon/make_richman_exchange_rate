@@ -40,35 +40,6 @@ def sort_signals(signals: list[Signal]) -> list[Signal]:
     return sorted(signals, key=lambda s: (round(s.percentile), rank.get(s.code, len(rank))))
 
 
-@dataclass(frozen=True)
-class Outlook:
-    score: int
-    grade: str              # 높음 | 보통 | 낮음
-    tags: tuple[str, ...]
-
-
-def outlook(q: Quote) -> Outlook:
-    """앞으로 오를 가능성을 규칙으로 점수화 (2023~2026 하나은행 환율 백테스트에서 고른 규칙, 보장 아님).
-
-    - 반등 확인(+2): 현재가가 5거래일 전 종가 이상. 하락이 이어지는 중이면 최저권이어도 이후 더 떨어진 경우가 많았다.
-    - 급락(-2): 180일 고점 대비 10% 이상 하락. 떨어지는 칼날이라 이후 수익이 가장 나빴다.
-    - 저점권(+1): 하위 5~30%. 가장 바닥(0~5%)보다 이 구간의 이후 성과가 좋았다.
-    """
-    pct, score, tags = percentile(q.price, q.history), 0, []
-    if q.price >= q.history[-6]:
-        score += 2
-        tags.append("반등")
-    else:
-        tags.append("하락 중")
-    if q.price / max(q.history) - 1 <= -0.10:
-        score -= 2
-        tags.append("급락")
-    if 5 <= pct <= 30:
-        score += 1
-        tags.append("저점권")
-    return Outlook(score, "높음" if score >= 3 else "보통" if score >= 1 else "낮음", tuple(tags))
-
-
 def percentile(price: float, history: list[float]) -> float:
     """history 중 price 보다 낮은 값의 비율 (0~100). 기간 최저면 0%."""
     # 야후 현재가는 값이 작은 통화(루피아 등)에서 소수 4자리로 반올림돼 오고 종가는 float32 오차가 있다

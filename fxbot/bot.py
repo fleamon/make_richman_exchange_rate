@@ -6,10 +6,11 @@
 import math
 from datetime import datetime, timedelta
 
+from . import odds
 from .config import Config, Currency
 from .ledger import LedgerError, preview_sell, replay
 from .rates import Quote
-from .strategy import PRIORITY, Signal, outlook, percentile, sell_target, sort_signals
+from .strategy import PRIORITY, Signal, percentile, sell_target, sort_signals
 
 HELP = """사용법 (환율은 토스 앱 표시 그대로, 수량은 외화 금액)
 매수 USD 1350.5 1000   — 1,350.5원에 1,000달러 샀음
@@ -148,22 +149,27 @@ def header_text(now: datetime) -> str:
 
 
 def buy_text(cfg: Config, quotes: dict[str, Quote], signals: list[Signal]) -> str:
-    """전 통화를 하위 % 오름차순으로 한 통에. 같은 %는 상승 가능성 점수 높은 순, 그다음 고정 우선순위.
+    """전 통화를 '30일 뒤 오를 확률' 높은 순으로 한 통에 (확률은 과거 백테스트 표, 같으면 하위 % 낮은 순).
 
     🟢 는 매수 신호 조건(하위 buy_percentile% 이하 등)을 채운 통화, ⚪ 는 아직 아닌 통화.
     """
     days = cfg.strategy.lookback_days
     flagged = {s.code for s in signals if s.side == "buy"}
+    table = odds.load()
     rank = {c: i for i, c in enumerate(PRIORITY)}
-    rows = sorted(((percentile(q.price, q.history), outlook(q), q) for q in quotes.values()),
-                  key=lambda r: (round(r[0]), -r[1].score, rank.get(r[2].code, len(rank))))
-    lines = [f"🟢 매수 신호 {len(flagged)}건 / 전체 {len(rows)}개 통화 (최근 {days}일, 하위 % 낮은 순 → 상승 가능성 높은 순)"]
-    for n, (pct, o, q) in enumerate(rows, 1):
+    rows = []
+    for q in quotes.values():
+        pct = percentile(q.price, q.history)
+        rows.append((odds.probability(table, q.code, pct), pct, q))
+    rows.sort(key=lambda r: (-(r[0] or 0), round(r[1]), rank.get(r[2].code, len(rank))))
+    lines = [f"🟢 매수 신호 {len(flagged)}건 / 전체 {len(rows)}개 통화 (최근 {days}일 기준, 30일 뒤 오를 확률 높은 순)"]
+    for n, (prob, pct, q) in enumerate(rows, 1):
         cur = cfg.currencies[q.code]
         drop, span = q.price / max(q.history) - 1, (max(q.history) - min(q.history)) / q.price
-        lines.append(f"{n}. {'🟢' if q.code in flagged else '⚪'} {label(cur)} {fx(q.price, cur)} · 하위 {pct:.0f}% · "
-                     f"고점 대비 {drop:+.1%} · 변동폭 {span:.0%} · 상승 가능성 {o.grade}({', '.join(o.tags)})")
-    lines.append("기록: '매수 통화 환율 수량'")
+        chance = f"오를 확률 {prob:.0%}" if prob is not None else "확률 표 없음"
+        lines.append(f"{n}. {'🟢' if q.code in flagged else '⚪'} {label(cur)} {fx(q.price, cur)} · {chance} · 하위 {pct:.0f}% · "
+                     f"고점 대비 {drop:+.1%} · 변동폭 {span:.0%}")
+    lines.append("확률은 과거 10년 환율 백테스트 기준의 참고치입니다. 기록: '매수 통화 환율 수량'")
     return "\n".join(lines)
 
 

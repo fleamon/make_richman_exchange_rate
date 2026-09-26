@@ -58,28 +58,32 @@ def _chart(session: requests.Session, symbol: str) -> tuple[float, datetime, dic
     raise RateError(f"{symbol}: {last_err}")
 
 
+def naver_history(session: requests.Session, cur: Currency, pages: int) -> dict[date, float]:
+    """하나은행 매매기준율 일별 종가 (최근 것부터 pages*60 거래일). 값은 1단위당 원화."""
+    series: dict[date, float] = {}
+    for page in range(1, pages + 1):
+        r = session.get(f"{NAVER}/prices", params={"category": "exchange", "reutersCode": f"FX_{cur.code}KRW",
+                                                   "page": page, "pageSize": NAVER_PAGE},
+                        headers=HEADERS, timeout=15)
+        r.raise_for_status()
+        rows = r.json()["result"]
+        series.update({date.fromisoformat(x["localTradedAt"]): float(x["closePrice"].replace(",", "")) / cur.unit
+                       for x in rows})
+        if len(rows) < NAVER_PAGE:
+            break
+    return series
+
+
 def _naver(session: requests.Session, cur: Currency, lookback_days: int) -> tuple[float, datetime, dict[date, float]]:
     """하나은행 매매기준율. 네이버는 토스와 같은 표시 단위(엔·루피아·동은 100 단위)로 주므로 1단위당으로 되돌린다."""
-    code = f"FX_{cur.code}KRW"
-    num = lambda v: float(v.replace(",", "")) / cur.unit
     try:
-        r = session.get(f"{NAVER}/productDetail", params={"category": "exchange", "reutersCode": code},
+        r = session.get(f"{NAVER}/productDetail", params={"category": "exchange", "reutersCode": f"FX_{cur.code}KRW"},
                         headers=HEADERS, timeout=15)
         r.raise_for_status()
         res = r.json()["result"]
-        price = num(res["closePrice"])
+        price = float(res["closePrice"].replace(",", "")) / cur.unit
         as_of = datetime.fromisoformat(res["localTradedAt"]).astimezone(timezone.utc)
-        series: dict[date, float] = {}
-        for page in range(1, lookback_days // NAVER_PAGE + 2):
-            r = session.get(f"{NAVER}/prices", params={"category": "exchange", "reutersCode": code,
-                                                       "page": page, "pageSize": NAVER_PAGE},
-                            headers=HEADERS, timeout=15)
-            r.raise_for_status()
-            rows = r.json()["result"]
-            series.update({date.fromisoformat(x["localTradedAt"]): num(x["closePrice"]) for x in rows})
-            if len(rows) < NAVER_PAGE:
-                break
-        return price, as_of, series
+        return price, as_of, naver_history(session, cur, lookback_days // NAVER_PAGE + 2)
     except (requests.RequestException, KeyError, IndexError, TypeError, ValueError) as e:
         raise RateError(f"{cur.code}: 네이버 {type(e).__name__}") from None
 
