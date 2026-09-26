@@ -39,6 +39,16 @@ def probability(table: dict, code: str, pct: float) -> float | None:
     return w * p + (1 - w) * pooled_p
 
 
+def dip_edge(table: dict, code: str) -> str | None:
+    """이 통화는 하위 10% 이하 저점에서 과거에 얼마나 잘 올랐나: 강함(60%↑) / 보통 / 약함(52%↓)."""
+    cells = [table["currency"].get(code, {}).get(b) for b in ("0", "1")] if table else []
+    cells = [c for c in cells if c]
+    if not cells:
+        return None
+    p = sum(c[0] * c[1] for c in cells) / sum(c[1] for c in cells)
+    return "강함" if p >= 0.60 else "약함" if p <= 0.52 else "보통"
+
+
 def build(history: dict[str, list[tuple[date, float]]], lookback_days: int) -> dict:
     """history: 통화 → (날짜, 1단위당 원화) 오래된 순. 각 날짜에서 구간별로 HORIZON 거래일 뒤 올랐는지 센다."""
     from datetime import timedelta
