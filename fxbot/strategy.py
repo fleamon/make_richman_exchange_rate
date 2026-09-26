@@ -42,8 +42,9 @@ def sort_signals(signals: list[Signal]) -> list[Signal]:
 
 def percentile(price: float, history: list[float]) -> float:
     """history 중 price 보다 낮은 값의 비율 (0~100). 기간 최저면 0%."""
-    # 야후 종가는 float32 오차가 있어 같은 값이 미세하게 다르게 온다 → 0.0001% 이내는 같은 값으로 본다
-    return 100 * sum(1 for h in history if h < price * (1 - 1e-6)) / len(history)
+    # 야후 현재가는 값이 작은 통화(루피아 등)에서 소수 4자리로 반올림돼 오고 종가는 float32 오차가 있다
+    # → 0.1% 이내 차이는 같은 값으로 본다 (그래야 오늘이 최저일 때 0% 로 나온다)
+    return 100 * sum(1 for h in history if h < price * (1 - 1e-3)) / len(history)
 
 
 def sell_target(lot: Lot, cur: Currency, s: Strategy) -> float:
