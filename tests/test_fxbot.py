@@ -32,7 +32,7 @@ def test_bot_only_answers_rates_signal_and_help():
     quotes = {"JPY": quote("JPY", 9.0, 8, 10)}
     assert "900.00" in bot.handle("환율", CFG, quotes, NOW)         # 토스 표시 단위(100엔)
     assert "조회 실패" in bot.handle("/rates", CFG, {}, NOW)
-    assert "1d 3d 5d" in bot.handle("신호", CFG, quotes, NOW)
+    assert "LOW%  1d  3d  5d" in bot.handle("신호", CFG, quotes, NOW)
     for text in ("매수 USD 1350 1000", "현황", "기록", "취소", "아무말", ""):
         assert bot.handle(text, CFG, quotes, NOW) == bot.HELP
 
@@ -61,7 +61,7 @@ def test_report_has_only_time_and_buy_table():
     text = bot.report_text(NOW, config.load(), quotes)
     assert text.startswith("📍 09/24 09:00 환율")
     assert "보유" not in text and "매도" not in text
-    assert "<pre>" not in text and "&" not in text   # 코드 블록·HTML 이스케이프 없이 일반 텍스트
+    assert text.count("<pre>") == text.count("</pre>") == 1   # 표는 코드 블록 하나
 
 
 def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
@@ -77,8 +77,9 @@ def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
     mk = lambda c, p: Quote(c, p, hist, NOW)
     quotes = {"USD": mk("USD", 100), "EUR": mk("EUR", 100), "JPY": mk("JPY", 100), "GBP": mk("GBP", 159)}
     body = bot._buy_rows(cfg, quotes)
-    assert [l.split()[1] for l in body[1:]] == ["EUR", "JPY", "USD", "GBP"]  # 하위 0% 셋(확률 순) → 하위 98%
-    assert body[0].split() == ["하위%"] + [f"{h}d" for h in odds.HORIZONS]     # 머리글은 하위% 1d 3d 5d 10d 20d
+    assert [l.split()[0] for l in body[2:]] == ["EUR", "JPY", "USD", "GBP"]  # 하위 0% 셋(확률 순) → 하위 98%
+    assert body[0].split() == ["CCY", "RATE", "LOW%"] + [f"{h}d" for h in odds.HORIZONS]
+    assert set(body[1]) == {"-"}                                             # 머리글 아래 구분선
 
 
 def test_buy_table_columns_are_aligned(monkeypatch):
@@ -88,8 +89,8 @@ def test_buy_table_columns_are_aligned(monkeypatch):
     hist = [100.0 + i for i in range(60)]
     quotes = {c: Quote(c, 100.0 + i, hist, NOW) for i, c in enumerate(("USD", "JPY", "IDR"))}
     body = bot._buy_rows(cfg, quotes)
-    assert len({bot._width(l) for l in body[1:]}) == 1               # 통화 줄은 모두 표시 폭이 같다
-    assert bot._width(body[0]) > bot._width(body[1])                 # 머리글만 일부러 오른쪽으로 밀어둔다
+    assert len({len(l) for l in body}) == 1                          # 머리글·구분선·통화 줄 폭이 같다
+    assert all(l.isascii() for l in body)                            # 고정폭에서 밀리는 국기·한글 없음
 
 
 def test_probability_shrinks_toward_pooled():

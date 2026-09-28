@@ -4,7 +4,7 @@
 이 봇은 알려주기만 한다 — 매수·보유 기록은 하지 않는다.
 """
 
-import unicodedata
+import html
 from datetime import datetime, timedelta
 
 from . import odds
@@ -34,25 +34,6 @@ def label(cur: Currency) -> str:
     return f"{cur.code}({cur.name})"
 
 
-def flag(code: str) -> str:
-    """통화 코드 앞 두 글자(= 국가 코드)로 국기 이모지. EUR 은 EU 깃발."""
-    return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in code[:2])
-
-
-def _width(s: str) -> int:
-    """고정폭 글꼴에서 차지하는 칸 수 (한글·이모지는 두 칸, 국기는 두 글자가 합쳐져 두 칸)."""
-    return sum(1 if 0x1F1E6 <= ord(c) <= 0x1F1FF else
-               2 if ord(c) > 0x2FFF or unicodedata.east_asian_width(c) in "WF" else 1 for c in s)
-
-
-def _pad(s: str, width: int, right: bool = True) -> str:
-    fill = " " * max(width - _width(s), 0)
-    return fill + s if right else s + fill
-
-
-PROB_W = (3, 3, 3, 4, 4)   # 확률 열 폭 — '10d' '20d' 머리글이 붙어 보이지 않게 뒤 두 열만 한 칸 넓다
-
-
 def handle(text: str, cfg: Config, quotes: dict[str, Quote], now: datetime) -> str:
     parts = text.strip().lstrip("/").split()
     cmd = ALIASES.get(parts[0].split("@")[0].lower()) if parts else None
@@ -76,11 +57,9 @@ def rates_text(cfg: Config, quotes: dict[str, Quote]) -> str:
 
 
 def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[str]:
-    """전 통화 행들 (머리글 포함). 하위 % 오름차순, 같은 %는 단기 확률 높은 순.
+    """전 통화 행들 (머리글·구분선 포함). 하위 % 오름차순, 같은 %는 단기 확률 높은 순.
 
-    본문 행에는 한글을 넣지 않는다 — 휴대폰 고정폭 글꼴에서 한글 폭이 일정하지 않아 열이 밀린다.
-    머리글의 '하위%' 만 예외로, 두 칸 폭으로 계산한 뒤 눈에 맞게 공백을 더 넣는다.
-    통화 7 + 환율 9 + 하위 4 + 확률 17 = 37칸.
+    코드 블록(고정폭)에 넣으므로 영문·숫자만 쓴다 — 국기·한글은 폭이 일정하지 않아 열이 밀린다.
     """
     table = odds.load()
     rank = {c: i for i, c in enumerate(PRIORITY)}
@@ -90,28 +69,22 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[str]:
         rows.append((odds.probabilities(table, q.code, pct), pct, q))
     rows.sort(key=lambda r: (round(r[1]), -(r[0].get(odds.RANK_HORIZON) or 0), rank.get(r[2].code, len(rank))))
 
-    # 머리글만 앞에 공백 7칸을 더 둔다 — 텔레그램 일반 텍스트(가변폭)에서는 숫자·국기보다
-    # 공백이 좁게 그려져, 칸 수를 맞추면 오히려 머리글이 왼쪽으로 쏠려 보인다.
-    body = [_pad("하위%", 27) + "".join(_pad(f"{h}d", w) for h, w in zip(odds.HORIZONS, PROB_W))]
+    prices = {q.code: fx(q.price, cfg.currencies[q.code]) for _, _, q in rows}
+    w = max([8, *map(len, prices.values())])   # 환율이 8자를 넘으면 열을 넓혀 줄을 맞춘다
+    header = f"{'CCY':<3} {'RATE':>{w}} {'LOW%':>4} " + " ".join(f"{f'{h}d':>3}" for h in odds.HORIZONS)
+    body = [header, "-" * len(header)]
     for probs, pct, q in rows:
-        cells = [_pad(f"{flag(q.code)} {q.code}", 7, right=False),
-                 _pad(fx(q.price, cfg.currencies[q.code]), 9), _pad(f"{pct:.0f}%", 4)]
-        cells += [_pad(f"{probs[h] * 100:.0f}" if h in probs else "-", w)
-                  for h, w in zip(odds.HORIZONS, PROB_W)]
-        body.append("".join(cells))
+        ups = " ".join(f"{probs[h] * 100:>3.0f}" if h in probs else "  -" for h in odds.HORIZONS)
+        body.append(f"{q.code:<3} {prices[q.code]:>{w}} {pct:>3.0f}% {ups}")
     return body
 
 
 def report_text(now: datetime, cfg: Config, quotes: dict[str, Quote]) -> str:
-    """정기 알림: 날짜·시간과 전 통화 매수 확률 표.
-
-    코드 블록(<pre>)을 쓰지 않고 일반 텍스트로 보낸다 — 텔레그램이 코드 블록 글꼴을
-    제멋대로 줄여서 줄 간격이 들쭉날쭉해지기 때문. 일반 텍스트는 가변폭이라 열이 딱 맞지는 않는다.
-    """
+    """정기 알림: 날짜·시간과 전 통화 매수 확률 표 (표는 코드 블록 <pre> 로 열을 맞춘다)."""
     kst = now + timedelta(hours=9)
     days = cfg.strategy.lookback_days
-    note = [f"※ 하위 % = 최근 {days}일 중 위치 (0%=최저)",
+    note = [f"※ LOW% = 최근 {days}일 중 위치 (0%=최저)",
             "※ 1d~20d = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용"]
-    body = "\n".join(r.rstrip() for r in _buy_rows(cfg, quotes))
-    return f"📍 {kst:%m/%d %H:%M} 환율 (하위 % 낮은 순)\n\n{body}\n\n" + "\n".join(note)
+    table = html.escape("\n".join(_buy_rows(cfg, quotes)))
+    return f"📍 {kst:%m/%d %H:%M} 환율 (하위% 낮은 순)\n<pre>{table}</pre>\n" + "\n".join(note)
