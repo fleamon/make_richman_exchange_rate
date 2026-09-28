@@ -82,7 +82,7 @@ def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
     assert body[0][0] == bot.HEADER_ICON
     assert body[0][1].split() == ["CCY", "RATE", "L%"] + [f"{h}d" for h in odds.HORIZONS]
     assert body[1][0] == bot.flag("EUR")
-    assert body[1][1].endswith(" 70 70 70 70 70")                            # 확률 열 사이는 한 칸씩
+    assert body[1][1].endswith(" 70 70 70  70  70")                          # 10d·20d 앞만 두 칸
 
 
 def test_buy_table_columns_are_aligned(monkeypatch):
@@ -92,7 +92,7 @@ def test_buy_table_columns_are_aligned(monkeypatch):
     hist = [100.0 + i for i in range(60)]
     quotes = {c: Quote(c, 100.0 + i, hist, NOW) for i, c in enumerate(("USD", "JPY", "IDR"))}
     body = bot._buy_rows(cfg, quotes)
-    assert len({len(r) for _, r in body[1:]}) == 1                   # 통화 줄 폭이 같다 (머리글은 10d·20d 만큼 김)
+    assert len({len(r) for _, r in body}) == 1                       # 머리글·통화 줄 폭이 같다 (오른쪽 끝 맞춤)
     assert all(r.isascii() for _, r in body)                         # 고정폭에서 밀리는 국기·한글 없음
 
 

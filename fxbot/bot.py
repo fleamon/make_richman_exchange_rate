@@ -85,11 +85,12 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote], low_shift: float = 0) -> li
     w = max([len("RATE"), *map(len, prices.values())])
     lw = max([len("L%"), *map(len, lows.values())])
     ups = {q.code: [f"{probs[h] * 100:.0f}" if h in probs else "-" for h in odds.HORIZONS] for probs, _, q in rows}
-    # 확률 열은 모두 같은 폭(보통 2자)에 한 칸씩 띄운다. 머리글 '10d' '20d' 만 한 자씩 길어 조금 삐져나온다.
-    pw = max([2, *(len(u) for us in ups.values() for u in us)])
+    # 확률 열은 한 칸씩 띄우고 오른쪽 정렬. 열 폭은 머리글·값 중 긴 쪽 — '10d' '20d' 열만 한 자 넓어 앞이 두 칸이 된다.
+    labels = [f"{h}d" for h in odds.HORIZONS]
+    pws = [max([len(lab), *(len(us[i]) for us in ups.values())]) for i, lab in enumerate(labels)]
     fmt = lambda ccy, rate, low, us: (f"{ccy:<3} {rate:>{w}} {low:>{lw}} "
-                                      + " ".join(f"{u:>{pw}}" for u in us))
-    body = [(HEADER_ICON, fmt("CCY", "RATE", "L%", [f"{h}d" for h in odds.HORIZONS]))]
+                                      + " ".join(f"{u:>{pw}}" for u, pw in zip(us, pws)))
+    body = [(HEADER_ICON, fmt("CCY", "RATE", "L%", labels))]
     body += [(flag(q.code), fmt(q.code, prices[q.code], lows[q.code], ups[q.code])) for _, _, q in rows]
     return body
 
