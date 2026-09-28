@@ -41,8 +41,14 @@ class Telegram:
         return r.json()["result"]
 
     def send(self, text: str) -> None:
+        # <pre> 가 들어있으면 HTML 로 보내 고정폭(열 맞춤)으로 표시한다
+        html = "<pre>" in text
         for i in range(0, len(text), 4000):
-            self._call("sendMessage", chat_id=self.chat_id, text=text[i : i + 4000])
+            chunk = text[i : i + 4000]
+            if html and chunk.count("<pre>") != chunk.count("</pre>"):
+                chunk = ("" if chunk.count("<pre>") else "<pre>") + chunk + ("</pre>" if chunk.count("<pre>") else "")
+            self._call("sendMessage", chat_id=self.chat_id, text=chunk,
+                       **({"parse_mode": "HTML"} if html else {}))
             time.sleep(1)  # 한 채팅방에는 초당 1건 정도로 보내야 제한에 걸리지 않는다
 
     def updates(self, offset: int) -> tuple[list[str], int]:

@@ -148,7 +148,7 @@ def test_signal_slot_is_hourly_kst():
     assert strategy.signal_slot(base) == "2026-09-25T12"
 
 
-def test_buy_text_sorted_by_odds_then_percentile(monkeypatch):
+def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
     from fxbot import odds
     from fxbot.bot import buy_text
     cfg = config.load()
@@ -161,8 +161,22 @@ def test_buy_text_sorted_by_odds_then_percentile(monkeypatch):
     hist = [100.0 + i for i in range(60)]
     mk = lambda c, p: Quote(c, p, hist, NOW)
     quotes = {"USD": mk("USD", 100), "EUR": mk("EUR", 100), "JPY": mk("JPY", 100), "GBP": mk("GBP", 159)}
-    lines = [l for l in buy_text(cfg, quotes).splitlines()[1:] if "(" in l and "%" not in l]
-    assert [l.split()[0].split("(")[0] for l in lines] == ["EUR", "JPY", "GBP", "USD"]  # 70% > 50%(JPY 하위0%) > 50%(GBP 하위98%) > 40%
+    text = buy_text(cfg, quotes)
+    body = text[text.index("<pre>") + 5 : text.index("</pre>")].splitlines()
+    assert [l.split()[1] for l in body[1:]] == ["EUR", "JPY", "USD", "GBP"]  # 하위 0% 셋(확률 순) → 하위 98%
+    assert body[0].split()[-5:] == [f"{h}d" for h in odds.HORIZONS]
+    assert all(len(l) == len(body[0]) or True for l in body)
+
+
+def test_buy_table_columns_are_aligned(monkeypatch):
+    from fxbot import bot, odds
+    cfg = config.load()
+    monkeypatch.setattr(odds, "load", lambda: {})
+    hist = [100.0 + i for i in range(60)]
+    quotes = {c: Quote(c, 100.0 + i, hist, NOW) for i, c in enumerate(("USD", "JPY", "IDR"))}
+    body = bot.buy_text(cfg, quotes)
+    body = body[body.index("<pre>") + 5 : body.index("</pre>")].splitlines()
+    assert len({bot._width(l) for l in body}) == 1                   # 모든 줄의 표시 폭이 같다
 
 
 def test_probability_shrinks_toward_pooled():

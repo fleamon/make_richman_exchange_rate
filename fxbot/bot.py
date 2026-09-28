@@ -3,7 +3,9 @@
 환율은 토스 앱과 같은 단위로 주고받는다 (엔·루피아·동은 100 단위).
 """
 
+import html
 import math
+import unicodedata
 from datetime import datetime, timedelta
 
 from . import odds
@@ -46,6 +48,22 @@ def fx(v: float, cur: Currency) -> str:
 
 def label(cur: Currency) -> str:
     return f"{cur.code}({cur.name})"
+
+
+def flag(code: str) -> str:
+    """통화 코드 앞 두 글자(= 국가 코드)로 국기 이모지. EUR 은 EU 깃발."""
+    return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in code[:2])
+
+
+def _width(s: str) -> int:
+    """고정폭 글꼴에서 차지하는 칸 수 (한글·이모지는 두 칸, 국기는 두 글자가 합쳐져 두 칸)."""
+    return sum(1 if 0x1F1E6 <= ord(c) <= 0x1F1FF else
+               2 if ord(c) > 0x2FFF or unicodedata.east_asian_width(c) in "WF" else 1 for c in s)
+
+
+def _pad(s: str, width: int, right: bool = True) -> str:
+    fill = " " * max(width - _width(s), 0)
+    return fill + s if right else s + fill
 
 
 def _num(s: str) -> float:
@@ -149,7 +167,7 @@ def header_text(now: datetime) -> str:
 
 
 def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
-    """전 통화를 'RANK_HORIZON 거래일 뒤 오를 확률' 높은 순으로 한 통에 (같으면 하위 % 낮은 순)."""
+    """전 통화를 하위 % 오름차순 고정폭 표로 (같은 %는 단기 확률 높은 순). 텔레그램은 <pre> 로 열을 맞춘다."""
     days = cfg.strategy.lookback_days
     table = odds.load()
     rank = {c: i for i, c in enumerate(PRIORITY)}
@@ -157,26 +175,23 @@ def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
     for q in quotes.values():
         pct = percentile(q.price, q.history)
         rows.append((odds.probabilities(table, q.code, pct), pct, q))
-    rows.sort(key=lambda r: (-(r[0].get(odds.RANK_HORIZON) or 0), round(r[1]), rank.get(r[2].code, len(rank))))
-    lines = [f"\U0001F7E2 매수 신호 · {len(rows)}개 통화 "
-             f"(최근 {days}일 기준, {odds.RANK_HORIZON}거래일 뒤 오를 확률 높은 순)"]
+    rows.sort(key=lambda r: (round(r[1]), -(r[0].get(odds.RANK_HORIZON) or 0), rank.get(r[2].code, len(rank))))
+
+    head = [_pad("통화", 7, right=False), _pad("환율", 10), _pad("하위", 5)]
+    head += [_pad(f"{h}d", 4) for h in odds.HORIZONS]
+    body = [" ".join(head)]
     for probs, pct, q in rows:
         cur = cfg.currencies[q.code]
-        drop, span = q.price / max(q.history) - 1, (max(q.history) - min(q.history)) / q.price
-        edge = odds.dip_edge(table, q.code)
-        lines.append(f"\n{label(cur)} {fx(q.price, cur)}\n"
-                     + ("오를 확률 " + " · ".join(f"{h}일 {p:.0%}" for h, p in probs.items())
-                        if probs else "확률 표 없음")
-                     + f"\n하위 {pct:.0f}% · 고점 대비 {drop:+.1%}\n변동폭 {span:.0%}"
-                     + (f" · 저점 반등 {edge}" if edge else ""))
-    lines.append("\n기록: '매수 통화 환율 수량'")
-    lines.append(f"\n※ 기준: 최근 {days}일 중 하위 %별로, 과거 10년 동안 "
-                 f"{'·'.join(str(h) for h in odds.HORIZONS)}거래일 뒤 오른 비율(통화별)입니다. "
-                 f"정렬은 {odds.RANK_HORIZON}거래일 확률 기준입니다. "
-                 "'저점 반등'은 이 통화가 하위 10% 이하에서 "
-                 f"{odds.EDGE_HORIZON}거래일 뒤 오른 비율(강함 60%↑ / 약함 52%↓)입니다. "
-                 "확률 차이는 작으니 참고용입니다.")
-    return "\n".join(lines)
+        cells = [_pad(f"{flag(q.code)} {q.code}", 7, right=False),
+                 _pad(fx(q.price, cur), 10), _pad(f"{pct:.0f}%", 5)]
+        cells += [_pad(f"{probs[h] * 100:.0f}" if h in probs else "-", 4) for h in odds.HORIZONS]
+        body.append(" ".join(cells))
+
+    note = (f"※ 하위 % = 최근 {days}일 중 위치(0%=최저). 1d~20d = 과거 10년 동안 같은 하위 % 구간에서 "
+            f"그 거래일 뒤 올라 있던 비율(%). 정렬은 하위 % 낮은 순.\n"
+            "기록: '매수 통화 환율 수량'")
+    return (f"🟢 매수 신호 · {len(rows)}개 통화 (최근 {days}일 기준, 하위 % 낮은 순)\n"
+            f"<pre>{html.escape(chr(10).join(body), quote=False)}</pre>\n{html.escape(note, quote=False)}")
 
 
 def signals_text(side: str, signals: list[Signal], cfg: Config) -> str:
