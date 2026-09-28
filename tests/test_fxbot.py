@@ -32,7 +32,7 @@ def test_bot_only_answers_rates_signal_and_help():
     quotes = {"JPY": quote("JPY", 9.0, 8, 10)}
     assert "900.00" in bot.handle("환율", CFG, quotes, NOW)         # 토스 표시 단위(100엔)
     assert "조회 실패" in bot.handle("/rates", CFG, {}, NOW)
-    assert "L% 1d 3d 5d 10d" in bot.handle("신호", CFG, quotes, NOW)
+    assert "L%  1  3  5 10" in bot.handle("신호", CFG, quotes, NOW)
     for text in ("매수 USD 1350 1000", "현황", "기록", "취소", "아무말", ""):
         assert bot.handle(text, CFG, quotes, NOW) == bot.HELP
 
@@ -80,9 +80,9 @@ def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
     body = bot._buy_rows(cfg, quotes)
     assert [r.split()[0] for _, r in body[1:]] == ["EUR", "JPY", "USD", "GBP"]  # 하위 0% 셋(확률 순) → 하위 98%
     assert body[0][0] == bot.HEADER_ICON
-    assert body[0][1].split() == ["CCY", "RATE", "L%", "1d", "3d", "5d", "10d"]    # 20d 는 표에서 뺐다
+    assert body[0][1].split() == ["CCY", "RATE", "L%", "1", "3", "5", "10"]        # 머리글 d 없음, 20 열은 뺐다
     assert body[1][0] == bot.flag("EUR")
-    assert body[1][1].endswith(" 70 70 70  70")                              # 10d 앞만 두 칸
+    assert body[1][1].endswith(" 70 70 70 70")                               # 확률 열 사이는 한 칸씩
 
 
 def test_buy_table_columns_are_aligned(monkeypatch):

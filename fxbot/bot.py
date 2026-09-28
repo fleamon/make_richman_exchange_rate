@@ -65,13 +65,11 @@ def flag(code: str) -> str:
     return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in code[:2])
 
 
-def _buy_rows(cfg: Config, quotes: dict[str, Quote], low_shift: float = 0,
-              suffix: str = "d") -> list[tuple[str, str]]:
+def _buy_rows(cfg: Config, quotes: dict[str, Quote], low_shift: float = 0) -> list[tuple[str, str]]:
     """전 통화 (국기, 고정폭 ASCII 행) 목록 (머리글 포함). 하위 % 오름차순, 같은 %는 단기 확률 높은 순.
 
     행은 영문·숫자만 쓴다 — 줄마다 인라인 코드(고정폭)로 감싸 열을 맞추고, 국기는 코드 밖 앞에 둔다.
     low_shift: 표 모양 확인용 — 하위 % 를 그만큼 올려서 만든다 (정기 알림은 0).
-    suffix: 확률 머리글 뒤에 붙일 글자 (1d 3d …). 비우면 1 3 5 10 20.
     """
     table = odds.load()
     rank = {c: i for i, c in enumerate(PRIORITY)}
@@ -89,7 +87,7 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote], low_shift: float = 0,
     lw = max([len("L%"), *map(len, lows.values())])
     ups = {q.code: [f"{probs[h] * 100:.0f}" if h in probs else "-" for h in SHOW_HORIZONS] for probs, _, q in rows}
     # 확률 열은 한 칸씩 띄우고 오른쪽 정렬. 열 폭은 머리글·값 중 긴 쪽 — '10d' '20d' 열만 한 자 넓어 앞이 두 칸이 된다.
-    labels = [f"{h}{suffix}" for h in SHOW_HORIZONS]
+    labels = [str(h) for h in SHOW_HORIZONS]   # 머리글은 거래일 수만 (1 3 5 10)
     pws = [max([len(lab), *(len(us[i]) for us in ups.values())]) for i, lab in enumerate(labels)]
     fmt = lambda ccy, rate, low, us: (f"{ccy:<3} {rate:>{w}} {low:>{lw}} "
                                       + " ".join(f"{u:>{pw}}" for u, pw in zip(us, pws)))
@@ -99,7 +97,7 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote], low_shift: float = 0,
 
 
 def report_text(now: datetime, cfg: Config, quotes: dict[str, Quote], low_shift: float = 0,
-                suffix: str = "d", test: bool = False) -> str:
+                test: bool = False) -> str:
     """정기 알림: 날짜·시간과 전 통화 매수 확률 표.
 
     코드 블록(<pre>) 대신 줄마다 인라인 <code> 로 감싸 HTML 로 보낸다 — 열은 고정폭으로 맞고,
@@ -108,8 +106,8 @@ def report_text(now: datetime, cfg: Config, quotes: dict[str, Quote], low_shift:
     kst = now + timedelta(hours=9)
     days = cfg.strategy.lookback_days
     note = [f"※ L% = 최근 {days}일 중 위치 (0%=최저)",
-            f"※ {SHOW_HORIZONS[0]}{suffix}~{SHOW_HORIZONS[-1]}{suffix} = 그 거래일 뒤 오른 비율(%)",
+            f"※ {SHOW_HORIZONS[0]}~{SHOW_HORIZONS[-1]} = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용"]
-    table = "\n".join(f"{icon} <code>{html.escape(row)}</code>" for icon, row in _buy_rows(cfg, quotes, low_shift, suffix))
-    test = f"[테스트 · 하위% +{low_shift:.0f}{'' if suffix else ' · 머리글 d 없음'}] " if test else ""
+    table = "\n".join(f"{icon} <code>{html.escape(row)}</code>" for icon, row in _buy_rows(cfg, quotes, low_shift))
+    test = f"[테스트 · 하위% +{low_shift:.0f}] " if test else ""
     return f"{test}📍 {kst:%m/%d %H:%M} 환율 (하위% 낮은 순)\n\n{table}\n\n" + "\n".join(note)
