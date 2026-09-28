@@ -4,7 +4,6 @@
 이 봇은 알려주기만 한다 — 매수·보유 기록은 하지 않는다.
 """
 
-import html
 import unicodedata
 from datetime import datetime, timedelta
 
@@ -54,12 +53,6 @@ def _pad(s: str, width: int, right: bool = True) -> str:
 PROB_W = (3, 3, 3, 4, 4)   # 확률 열 폭 — '10d' '20d' 머리글이 붙어 보이지 않게 뒤 두 열만 한 칸 넓다
 
 
-def _table(rows: list[str]) -> str:
-    """고정폭 표. 줄 끝 공백은 텔레그램이 버리므로 각 행은 숫자로 끝나게 만들어 둔다."""
-    body = "\n".join(r.rstrip() for r in rows)
-    return f"<pre>{html.escape(body, quote=False)}</pre>"
-
-
 def handle(text: str, cfg: Config, quotes: dict[str, Quote], now: datetime) -> str:
     parts = text.strip().lstrip("/").split()
     cmd = ALIASES.get(parts[0].split("@")[0].lower()) if parts else None
@@ -107,16 +100,15 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[str]:
 
 
 def report_text(now: datetime, cfg: Config, quotes: dict[str, Quote]) -> str:
-    """정기 알림: 날짜·시간과 전 통화 매수 확률 표 하나.
+    """정기 알림: 날짜·시간과 전 통화 매수 확률 표.
 
-    코드 블록을 하나만 쓴다 — 텔레그램이 블록마다 글꼴을 따로 줄여서, 나눠 보내면
-    표끼리 글자 크기와 줄 간격이 달라진다.
+    코드 블록(<pre>)을 쓰지 않고 일반 텍스트로 보낸다 — 텔레그램이 코드 블록 글꼴을
+    제멋대로 줄여서 줄 간격이 들쭉날쭉해지기 때문. 일반 텍스트는 가변폭이라 열이 딱 맞지는 않는다.
     """
     kst = now + timedelta(hours=9)
     days = cfg.strategy.lookback_days
     note = [f"※ 하위 % = 최근 {days}일 중 위치 (0%=최저)",
             "※ 1d~20d = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용"]
-    return (f"📍 {kst:%m/%d %H:%M} 환율 (하위 % 낮은 순)\n\n"
-            f"{_table(_buy_rows(cfg, quotes))}\n\n"
-            + html.escape("\n".join(note), quote=False))
+    body = "\n".join(r.rstrip() for r in _buy_rows(cfg, quotes))
+    return f"📍 {kst:%m/%d %H:%M} 환율 (하위 % 낮은 순)\n\n{body}\n\n" + "\n".join(note)

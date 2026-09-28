@@ -32,7 +32,7 @@ def test_bot_only_answers_rates_signal_and_help():
     quotes = {"JPY": quote("JPY", 9.0, 8, 10)}
     assert "900.00" in bot.handle("환율", CFG, quotes, NOW)         # 토스 표시 단위(100엔)
     assert "조회 실패" in bot.handle("/rates", CFG, {}, NOW)
-    assert "<pre>" in bot.handle("신호", CFG, quotes, NOW)
+    assert "1d 3d 5d" in bot.handle("신호", CFG, quotes, NOW)
     for text in ("매수 USD 1350 1000", "현황", "기록", "취소", "아무말", ""):
         assert bot.handle(text, CFG, quotes, NOW) == bot.HELP
 
@@ -61,7 +61,7 @@ def test_report_has_only_time_and_buy_table():
     text = bot.report_text(NOW, config.load(), quotes)
     assert text.startswith("📍 09/24 09:00 환율")
     assert "보유" not in text and "매도" not in text
-    assert text.count("<pre>") == 1
+    assert "<pre>" not in text and "&" not in text   # 코드 블록·HTML 이스케이프 없이 일반 텍스트
 
 
 def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
