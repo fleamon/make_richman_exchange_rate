@@ -56,7 +56,6 @@ def rates_text(cfg: Config, quotes: dict[str, Quote]) -> str:
     return "\n".join(lines)
 
 
-PROB_W = (3, 3, 3, 4, 4)   # 1d 3d 5d 10d 20d 열 폭
 HEADER_ICON = "🏳️"   # 머리글 줄 앞 자리 채움 — 국기와 같은 폭
 
 
@@ -65,16 +64,17 @@ def flag(code: str) -> str:
     return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in code[:2])
 
 
-def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[tuple[str, str]]:
+def _buy_rows(cfg: Config, quotes: dict[str, Quote], low_shift: float = 0) -> list[tuple[str, str]]:
     """전 통화 (국기, 고정폭 ASCII 행) 목록 (머리글 포함). 하위 % 오름차순, 같은 %는 단기 확률 높은 순.
 
     행은 영문·숫자만 쓴다 — 줄마다 인라인 코드(고정폭)로 감싸 열을 맞추고, 국기는 코드 밖 앞에 둔다.
+    low_shift: 표 모양 확인용 — 하위 % 를 그만큼 올려서 만든다 (정기 알림은 0).
     """
     table = odds.load()
     rank = {c: i for i, c in enumerate(PRIORITY)}
     rows = []
     for q in quotes.values():
-        pct = percentile(q.price, q.history)
+        pct = min(percentile(q.price, q.history) + low_shift, 100)
         rows.append((odds.probabilities(table, q.code, pct), pct, q))
     rows.sort(key=lambda r: (round(r[1]), -(r[0].get(odds.RANK_HORIZON) or 0), rank.get(r[2].code, len(rank))))
 
@@ -84,27 +84,27 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[tuple[str, str]]:
     # 환율·L% 열은 가장 긴 값에 딱 맞춘다 (남는 빈칸 없이, 짧은 값만 앞에 공백을 채워 줄을 맞춘다)
     w = max([len("RATE"), *map(len, prices.values())])
     lw = max([len("L%"), *map(len, lows.values())])
-    # 확률 열은 사이 공백 없이 폭만 준다 — 한 줄이 휴대폰 폭을 넘어 두 줄로 꺾이지 않게.
-    # '10d' '20d' 머리글이 붙어 보이지 않게 뒤 두 열만 한 칸 넓다.
-    fmt = lambda ccy, rate, low, ups: (f"{ccy:<3} {rate:>{w}} {low:>{lw}}"
-                                       + "".join(f"{u:>{pw}}" for u, pw in zip(ups, PROB_W)))
+    ups = {q.code: [f"{probs[h] * 100:.0f}" if h in probs else "-" for h in odds.HORIZONS] for probs, _, q in rows}
+    # 확률 열은 모두 같은 폭(보통 2자)에 한 칸씩 띄운다. 머리글 '10d' '20d' 만 한 자씩 길어 조금 삐져나온다.
+    pw = max([2, *(len(u) for us in ups.values() for u in us)])
+    fmt = lambda ccy, rate, low, us: (f"{ccy:<3} {rate:>{w}} {low:>{lw}} "
+                                      + " ".join(f"{u:>{pw}}" for u in us))
     body = [(HEADER_ICON, fmt("CCY", "RATE", "L%", [f"{h}d" for h in odds.HORIZONS]))]
-    for probs, pct, q in rows:
-        ups = [f"{probs[h] * 100:.0f}" if h in probs else "-" for h in odds.HORIZONS]
-        body.append((flag(q.code), fmt(q.code, prices[q.code], lows[q.code], ups)))
+    body += [(flag(q.code), fmt(q.code, prices[q.code], lows[q.code], ups[q.code])) for _, _, q in rows]
     return body
 
 
-def report_text(now: datetime, cfg: Config, quotes: dict[str, Quote]) -> str:
+def report_text(now: datetime, cfg: Config, quotes: dict[str, Quote], low_shift: float = 0) -> str:
     """정기 알림: 날짜·시간과 전 통화 매수 확률 표.
 
     코드 블록(<pre>) 대신 줄마다 인라인 <code> 로 감싸 HTML 로 보낸다 — 열은 고정폭으로 맞고,
-    국기는 코드 밖에 있어 컬러로 보인다.
+    국기는 코드 밖에 있어 컬러로 보인다. low_shift 를 주면 제목에 [테스트] 를 붙인다.
     """
     kst = now + timedelta(hours=9)
     days = cfg.strategy.lookback_days
     note = [f"※ L% = 최근 {days}일 중 위치 (0%=최저)",
             "※ 1d~20d = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용"]
-    table = "\n".join(f"{icon} <code>{html.escape(row)}</code>" for icon, row in _buy_rows(cfg, quotes))
-    return f"📍 {kst:%m/%d %H:%M} 환율 (하위% 낮은 순)\n\n{table}\n\n" + "\n".join(note)
+    table = "\n".join(f"{icon} <code>{html.escape(row)}</code>" for icon, row in _buy_rows(cfg, quotes, low_shift))
+    test = f"[테스트 · 하위% +{low_shift:.0f}] " if low_shift else ""
+    return f"{test}📍 {kst:%m/%d %H:%M} 환율 (하위% 낮은 순)\n\n{table}\n\n" + "\n".join(note)
