@@ -117,13 +117,18 @@ def test_sell_signal_on_any_profit():
     assert [s.side for s in sigs] == ["sell"] and sigs[0].profit > 0
 
 
+def table_lines(text: str) -> list[str]:
+    """메시지의 표 부분(제목과 안내 사이 문단)만 줄 단위로."""
+    block = text.split("\n\n")[1]
+    return block.replace("<pre>", "").replace("</pre>", "").splitlines()
+
+
 def test_history_shows_average_of_holdings():
     st = state.empty()
     for cmd in ("매수 JPY 900 100000", "매수 JPY 880 100000", "매도 JPY 950 50000", "매수 USD 1300 10"):
         bot.handle(cmd, st, CFG, {}, NOW)
     text = bot.handle("현황", st, CFG, {"USD": quote("USD", 1310)}, NOW)
-    rows = {l.split()[0]: l.split() for l in
-            text[text.index("<pre>") + 5 : text.index("</pre>")].splitlines()}
+    rows = {l.split()[0]: l.split() for l in table_lines(text)}
     # 선입선출로 900원 5만엔 + 880원 10만엔이 남음 → 평균 886.67
     assert rows["JPY"] == ["JPY", "150,000.00", "886.67", "-"]
     assert rows["USD"] == ["USD", "10.00", "1,300.00", "+100"]
@@ -164,8 +169,7 @@ def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
     hist = [100.0 + i for i in range(60)]
     mk = lambda c, p: Quote(c, p, hist, NOW)
     quotes = {"USD": mk("USD", 100), "EUR": mk("EUR", 100), "JPY": mk("JPY", 100), "GBP": mk("GBP", 159)}
-    text = buy_text(cfg, quotes)
-    body = text[text.index("<pre>") + 5 : text.index("</pre>")].splitlines()
+    body = table_lines(buy_text(cfg, quotes))
     assert [l.split()[0] for l in body[1:]] == ["EUR", "JPY", "USD", "GBP"]  # 하위 0% 셋(확률 순) → 하위 98%
     assert body[0].split()[-5:] == [str(h) for h in odds.HORIZONS]
     assert all(len(l) == len(body[0]) or True for l in body)
@@ -177,8 +181,7 @@ def test_buy_table_columns_are_aligned(monkeypatch):
     monkeypatch.setattr(odds, "load", lambda: {})
     hist = [100.0 + i for i in range(60)]
     quotes = {c: Quote(c, 100.0 + i, hist, NOW) for i, c in enumerate(("USD", "JPY", "IDR"))}
-    body = bot.buy_text(cfg, quotes)
-    body = body[body.index("<pre>") + 5 : body.index("</pre>")].splitlines()
+    body = table_lines(bot.buy_text(cfg, quotes))
     assert len({bot._width(l) for l in body}) == 1                   # 모든 줄의 표시 폭이 같다
 
 

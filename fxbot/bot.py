@@ -67,8 +67,7 @@ TABLE_WIDTH = 33   # 모든 표의 줄 폭을 같게 둬야 텔레그램이 코�
 
 def _table(rows: list[str]) -> str:
     """고정폭 표. 줄 끝 공백은 텔레그램이 버리므로 마지막 칸은 항상 숫자로 끝나게 오른쪽 정렬한다."""
-    body = "\n".join(_pad(r.rstrip(), TABLE_WIDTH) for r in rows)
-    return f"<pre>{html.escape(body, quote=False)}</pre>"
+    return "\n".join(_pad(r.rstrip(), TABLE_WIDTH) for r in rows)
 
 
 def _num(s: str) -> float:
@@ -152,7 +151,7 @@ def status_text(state: dict, cfg: Config, quotes: dict[str, Quote]) -> str:
         body.append("".join([_pad(code, 4, right=False),
                              _pad(f"{amount:,.2f}", 10), _pad(fx(avg, cur), 9),
                              _pad(f"{pnl:+,.0f}" if pnl is not None else "-", 10)]))
-    return ("[2안] 보유 현황\n"
+    return ("[3안] 보유 현황\n"
             "(수량 / 평균 매수가 / 평가손익)\n\n"
             f"{_table(body)}\n\n"
             f"총 원가 {won(cost_sum)}\n"
@@ -202,7 +201,7 @@ def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
             "※ 1~20 = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용",
             "기록: '매수 통화 환율 수량'"]
-    return (f"[2안] 매수 신호 · {len(rows)}개 통화\n\n{_table(body)}\n\n"
+    return (f"[3안] 매수 신호 · {len(rows)}개 통화\n\n{_table(body)}\n\n"
             + html.escape("\n".join(note), quote=False))
 
 
@@ -210,12 +209,12 @@ def signals_text(side: str, signals: list[Signal], cfg: Config) -> str:
     """매도 신호를 고정폭 표 하나로 (환율 / 하위 % / 예상 이익). 하위 % 오름차순."""
     sigs = sort_signals([s for s in signals if s.side == side])
     if not sigs:
-        return "[2안] 매도 신호 없음"
+        return "[3안] 매도 신호 없음"
     body = ["".join([_pad(sig.code, 4, right=False),
                      _pad(fx(sig.price, cfg.currencies[sig.code]), 9),
                      _pad(f"{sig.percentile:.0f}%", 4), _pad(f"{sig.profit:+,.0f}", 16)])
             for sig in sigs]
-    return (f"[2안] 매도 신호 {len(sigs)}건\n"
+    return (f"[3안] 매도 신호 {len(sigs)}건\n"
             "(환율 / 하위 % / 예상 이익)\n\n"
             f"{_table(body)}\n\n"
             "기록: '매도 통화 환율 수량'")
