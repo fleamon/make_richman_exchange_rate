@@ -56,6 +56,7 @@ def rates_text(cfg: Config, quotes: dict[str, Quote]) -> str:
     return "\n".join(lines)
 
 
+SHOW_HORIZONS = (1, 3, 5, 10)   # 표에 보이는 확률 열 (20거래일은 폭이 모자라 뺐다)
 HEADER_ICON = "🏳️"   # 머리글 줄 앞 자리 채움 — 국기와 같은 폭
 
 
@@ -86,9 +87,9 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote], low_shift: float = 0,
     # 환율·L% 열은 가장 긴 값에 딱 맞춘다 (남는 빈칸 없이, 짧은 값만 앞에 공백을 채워 줄을 맞춘다)
     w = max([len("RATE"), *map(len, prices.values())])
     lw = max([len("L%"), *map(len, lows.values())])
-    ups = {q.code: [f"{probs[h] * 100:.0f}" if h in probs else "-" for h in odds.HORIZONS] for probs, _, q in rows}
+    ups = {q.code: [f"{probs[h] * 100:.0f}" if h in probs else "-" for h in SHOW_HORIZONS] for probs, _, q in rows}
     # 확률 열은 한 칸씩 띄우고 오른쪽 정렬. 열 폭은 머리글·값 중 긴 쪽 — '10d' '20d' 열만 한 자 넓어 앞이 두 칸이 된다.
-    labels = [f"{h}{suffix}" for h in odds.HORIZONS]
+    labels = [f"{h}{suffix}" for h in SHOW_HORIZONS]
     pws = [max([len(lab), *(len(us[i]) for us in ups.values())]) for i, lab in enumerate(labels)]
     fmt = lambda ccy, rate, low, us: (f"{ccy:<3} {rate:>{w}} {low:>{lw}} "
                                       + " ".join(f"{u:>{pw}}" for u, pw in zip(us, pws)))
@@ -107,7 +108,7 @@ def report_text(now: datetime, cfg: Config, quotes: dict[str, Quote], low_shift:
     kst = now + timedelta(hours=9)
     days = cfg.strategy.lookback_days
     note = [f"※ L% = 최근 {days}일 중 위치 (0%=최저)",
-            f"※ 1{suffix}~20{suffix} = 그 거래일 뒤 오른 비율(%)",
+            f"※ {SHOW_HORIZONS[0]}{suffix}~{SHOW_HORIZONS[-1]}{suffix} = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용"]
     table = "\n".join(f"{icon} <code>{html.escape(row)}</code>" for icon, row in _buy_rows(cfg, quotes, low_shift, suffix))
     test = f"[테스트 · 하위% +{low_shift:.0f}{'' if suffix else ' · 머리글 d 없음'}] " if test else ""
