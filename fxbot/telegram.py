@@ -41,10 +41,17 @@ class Telegram:
         return r.json()["result"]
 
     def send(self, text: str) -> None:
-        # <pre> 가 들어있으면 HTML 로 보내 고정폭(열 맞춤)으로 표시한다
-        html = "<pre>" in text
-        for i in range(0, len(text), 4000):
-            chunk = text[i : i + 4000]
+        # <pre>·<code> 가 들어있으면 HTML 로 보내 고정폭(열 맞춤)으로 표시한다.
+        # 4000자 제한은 줄 단위로 끊어 태그가 중간에 잘리지 않게 한다.
+        html = "<pre>" in text or "<code>" in text
+        chunks, cur = [], ""
+        for line in text.split("\n"):
+            if cur and len(cur) + len(line) + 1 > 4000:
+                chunks.append(cur)
+                cur = ""
+            cur = f"{cur}\n{line}" if cur else line
+        chunks.append(cur)
+        for chunk in chunks:
             if html and chunk.count("<pre>") != chunk.count("</pre>"):
                 chunk = ("" if chunk.count("<pre>") else "<pre>") + chunk + ("</pre>" if chunk.count("<pre>") else "")
             self._call("sendMessage", chat_id=self.chat_id, text=chunk,

@@ -4,6 +4,7 @@
 이 봇은 알려주기만 한다 — 매수·보유 기록은 하지 않는다.
 """
 
+import html
 from datetime import datetime, timedelta
 
 from . import odds
@@ -55,23 +56,18 @@ def rates_text(cfg: Config, quotes: dict[str, Quote]) -> str:
     return "\n".join(lines)
 
 
-FIGURE_SPACE, PUNCT_SPACE, FIGURE_DASH = "\u2007", "\u2008", "\u2012"
-PUNCT = ",."
+HEADER_ICON = "🏳️"   # 머리글 줄 앞 자리 채움 — 국기와 같은 폭
 
 
-def _fit(cell: str, digits: int, puncts: int, fs: str, ps: str) -> str:
-    """오른쪽 정렬. 숫자 자리는 fs, 쉼표·점 자리는 ps 로 채운다."""
-    p = sum(c in PUNCT for c in cell)
-    return fs * (digits - (len(cell) - p)) + ps * (puncts - p) + cell
+def flag(code: str) -> str:
+    """통화 코드 앞 두 글자(= 국가 코드)로 국기 이모지. EUR 은 EU 깃발."""
+    return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in code[:2])
 
 
-def _buy_rows(cfg: Config, quotes: dict[str, Quote], plain: bool = False) -> list[str]:
-    """전 통화 행들 (머리글·구분선 포함). 하위 % 오름차순, 같은 %는 단기 확률 높은 순.
+def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[tuple[str, str]]:
+    """전 통화 (국기, 고정폭 ASCII 행) 목록 (머리글 포함). 하위 % 오름차순, 같은 %는 단기 확률 높은 순.
 
-    영문·숫자만 쓴다 — 국기·한글은 폭이 일정하지 않아 열이 밀린다.
-    plain=True 면 코드 블록 없이 가변폭 글꼴에서도 열이 맞게, 빈칸을 숫자 폭 공백(U+2007)과
-    쉼표·점 폭 공백(U+2008)으로 채우고 '-' 는 숫자 폭 대시(U+2012)로 쓴다.
-    휴대폰 기본 글꼴은 숫자 폭이 모두 같아 숫자 열은 맞고, 통화 코드 글자 폭 차이만 약간 남는다.
+    행은 영문·숫자만 쓴다 — 줄마다 인라인 코드(고정폭)로 감싸 열을 맞추고, 국기는 코드 밖 앞에 둔다.
     """
     table = odds.load()
     rank = {c: i for i, c in enumerate(PRIORITY)}
@@ -81,28 +77,26 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote], plain: bool = False) -> lis
         rows.append((odds.probabilities(table, q.code, pct), pct, q))
     rows.sort(key=lambda r: (round(r[1]), -(r[0].get(odds.RANK_HORIZON) or 0), rank.get(r[2].code, len(rank))))
 
-    fs, ps, dash = (FIGURE_SPACE, PUNCT_SPACE, FIGURE_DASH) if plain else (" ", " ", "-")
-    header = ["CCY", "RATE", "LOW%"] + [f"{h}d" for h in odds.HORIZONS]
-    cells = [[q.code, fx(q.price, cfg.currencies[q.code]), f"{pct:.0f}%"]
-             + [f"{probs[h] * 100:.0f}" if h in probs else dash for h in odds.HORIZONS]
-             for probs, pct, q in rows]
-    grid = [header] + cells
-    # 열마다 숫자 자리·쉼표 자리를 따로 세어, 가장 긴 칸에 맞춰 채운다 (환율이 길어지면 열도 넓어진다)
-    puncts = [max(sum(c in PUNCT for c in r[i]) for r in grid) for i in range(len(header))]
-    digits = [max(max(len(r[i]) - sum(c in PUNCT for c in r[i]) for r in grid), 3) for i in range(len(header))]
-    digits[1] = max(digits[1], 8 - puncts[1])
-    lines = [fs.join([r[0] + fs * (digits[0] - len(r[0]))]
-                     + [_fit(c, d, p, fs, ps) for c, d, p in zip(r[1:], digits[1:], puncts[1:])]) for r in grid]
-    width = sum(digits) + len(header) - 1 + (0 if plain else sum(puncts))
-    return [lines[0], dash * width] + lines[1:]
+    prices = {q.code: fx(q.price, cfg.currencies[q.code]) for _, _, q in rows}
+    w = max([8, *map(len, prices.values())])   # 환율이 8자를 넘으면 열을 넓혀 줄을 맞춘다
+    fmt = lambda ccy, rate, low, ups: f"{ccy:<3} {rate:>{w}} {low:>4} " + " ".join(f"{u:>3}" for u in ups)
+    body = [(HEADER_ICON, fmt("CCY", "RATE", "LOW%", [f"{h}d" for h in odds.HORIZONS]))]
+    for probs, pct, q in rows:
+        ups = [f"{probs[h] * 100:.0f}" if h in probs else "-" for h in odds.HORIZONS]
+        body.append((flag(q.code), fmt(q.code, prices[q.code], f"{pct:.0f}%", ups)))
+    return body
 
 
 def report_text(now: datetime, cfg: Config, quotes: dict[str, Quote]) -> str:
-    """정기 알림: 날짜·시간과 전 통화 매수 확률 표 (코드 블록 없이 일반 텍스트)."""
+    """정기 알림: 날짜·시간과 전 통화 매수 확률 표.
+
+    코드 블록(<pre>) 대신 줄마다 인라인 <code> 로 감싸 HTML 로 보낸다 — 열은 고정폭으로 맞고,
+    국기는 코드 밖에 있어 컬러로 보인다.
+    """
     kst = now + timedelta(hours=9)
     days = cfg.strategy.lookback_days
     note = [f"※ LOW% = 최근 {days}일 중 위치 (0%=최저)",
             "※ 1d~20d = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용"]
-    table = "\n".join(_buy_rows(cfg, quotes, plain=True))
-    return f"📍 {kst:%m/%d %H:%M} 환율 (하위% 낮은 순)\n{table}\n" + "\n".join(note)
+    table = "\n".join(f"{icon} <code>{html.escape(row)}</code>" for icon, row in _buy_rows(cfg, quotes))
+    return f"📍 {kst:%m/%d %H:%M} 환율 (하위% 낮은 순)\n\n{table}\n\n" + "\n".join(note)
