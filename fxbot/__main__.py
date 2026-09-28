@@ -42,7 +42,8 @@ def run() -> None:
             tg.send(report_text(now, cfg, quotes))
             st["signal_slot"] = slot
         if os.environ.get("TEST_LOW_SHIFT"):   # 표 모양 확인용 테스트 메시지 (하위 % 를 올려서)
-            tg.send(report_text(now, cfg, quotes, low_shift=float(os.environ["TEST_LOW_SHIFT"])))
+            tg.send(report_text(now, cfg, quotes, low_shift=float(os.environ["TEST_LOW_SHIFT"]),
+                                suffix="" if os.environ.get("TEST_NO_D") else "d", test=True))
     st.pop("alerts", None)
 
     # 공개 로그라 명령·알림 건수나 상태 변경 여부도 남기지 않는다
