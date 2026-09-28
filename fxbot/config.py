@@ -12,15 +12,11 @@ class Currency:
     name: str
     unit: int = 1
     via_usd: bool = False
-    buy_fee: float = 0.0   # 비율 (0.01 = 1%)
-    sell_fee: float = 0.0
 
 
 @dataclass(frozen=True)
 class Strategy:
     lookback_days: int = 90
-    buy_percentile: float = 5
-    min_profit_pct: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -31,16 +27,9 @@ class Config:
 
 def load(path: Path = CONFIG_PATH) -> Config:
     raw = tomllib.loads(path.read_text(encoding="utf-8"))
-    fees = raw.get("fees", {})
-    currencies = {}
-    for code, c in raw["currencies"].items():
-        fee = {**fees, **fees.get(code, {})}
-        currencies[code] = Currency(
-            code=code,
-            name=c.get("name", code),
-            unit=c.get("unit", 1),
-            via_usd=c.get("via_usd", False),
-            buy_fee=fee.get("buy_pct", 0.0) / 100,
-            sell_fee=fee.get("sell_pct", 0.0) / 100,
-        )
+    currencies = {
+        code: Currency(code=code, name=c.get("name", code),
+                       unit=c.get("unit", 1), via_usd=c.get("via_usd", False))
+        for code, c in raw["currencies"].items()
+    }
     return Config(strategy=Strategy(**raw.get("strategy", {})), currencies=currencies)

@@ -1,12 +1,12 @@
 """python -m fxbot [run|keygen|chatid|rates|backtest]
 
-run    : (GitHub Actions) 텔레그램 기록 명령 처리 → 환율 조회 → 신호 알림 → 암호화 상태 저장
+run    : (GitHub Actions) 텔레그램 명령 처리 → 환율 조회 → 매수 확률 알림 → 암호화 상태 저장
 keygen : STATE_KEY 로 쓸 암호화 키 생성
 chatid : TELEGRAM_TOKEN 으로 봇에 온 메시지의 chat id 출력 (최초 설정용)
 backtest: 과거 10년 환율로 '하위 % 구간별 1·3·5·10·20거래일 뒤 상승 확률' 표(fxbot/odds.json) 재생성
 rates  : 현재 환율과 3개월 위치를 화면에 출력 (로컬 확인용)
 
-공개 저장소의 Actions 로그는 누구나 볼 수 있으므로, run 은 보유·거래 정보를 로그에 출력하지 않는다.
+공개 저장소의 Actions 로그는 누구나 볼 수 있으므로, run 은 환율 조회 개수 외에는 로그에 출력하지 않는다.
 """
 
 import os
@@ -14,8 +14,7 @@ import sys
 from datetime import datetime, timezone
 
 from . import config, odds, rates, state, strategy
-from .bot import handle, rates_text, report_text, status_text
-from .ledger import replay
+from .bot import handle, rates_text, report_text
 from .telegram import Telegram
 
 
@@ -33,20 +32,18 @@ def run() -> None:
     else:
         texts, st["tg_offset"] = tg.updates(st["tg_offset"])
         for text in texts:
-            tg.send(handle(text, st, cfg, quotes, now))
-        # 뒤의 신호 발송이 실패해도 처리한 명령이 다음 실행에 중복 기록되지 않게 먼저 저장한다
+            tg.send(handle(text, cfg, quotes, now))
+        # 뒤의 알림 발송이 실패해도 같은 명령을 다음 실행에 또 처리하지 않게 먼저 저장한다
         if state.dumps(st) != before:
             state.save(st)
 
         slot = strategy.signal_slot(now)
         if st.get("signal_slot") != slot or os.environ.get("FORCE_SIGNAL"):
-            sigs = strategy.run(cfg, quotes, replay(st["trades"], cfg.currencies))
-            # 매수·보유·매도를 한 통에 (코드 블록이 하나여야 표끼리 글자 크기가 같다)
-            tg.send(report_text(now, cfg, quotes, st, sigs))
+            tg.send(report_text(now, cfg, quotes))
             st["signal_slot"] = slot
     st.pop("alerts", None)
 
-    # 공개 로그라 명령·알림 건수나 상태 변경 여부도 남기지 않는다 (거래 활동 추정 방지)
+    # 공개 로그라 명령·알림 건수나 상태 변경 여부도 남기지 않는다
     if state.dumps(st) != before:
         state.save(st)
     print("완료")
