@@ -132,21 +132,27 @@ def handle(text: str, state: dict, cfg: Config, quotes: dict[str, Quote], now: d
 
 
 def status_text(state: dict, cfg: Config, quotes: dict[str, Quote]) -> str:
+    """보유 통화를 고정폭 표로 (수량 / 평균 매수 환율 / 현재 환율 / 평가손익)."""
     lots = replay(state["trades"], cfg.currencies)
     if not lots:
         return "보유 중인 외화가 없습니다."
-    lines, total = ["보유 현황"], 0.0
+    body, total, cost_sum = [], 0.0, 0.0
     for code, ls in lots.items():
         cur, q = cfg.currencies[code], quotes.get(code)
         amount, cost = sum(l.amount for l in ls), sum(l.cost(cur) for l in ls)
         avg = sum(l.rate * l.amount for l in ls) / amount
-        lines.append(f"\n{label(cur)} {amount:,.2f}\n  평균 {fx(avg, cur)} ({len(ls)}회 매수) / 원가 {won(cost)}")
-        if q:
-            pnl = amount * q.price * (1 - cur.sell_fee) - cost
-            total += pnl
-            lines.append(f"  현재 {fx(q.price, cur)} → 평가손익 {won(pnl)}")
-    lines.append(f"\n총 평가손익 {won(total)}")
-    return "\n".join(lines)
+        cost_sum += cost
+        pnl = amount * q.price * (1 - cur.sell_fee) - cost if q else None
+        total += pnl or 0.0
+        body.append("".join([_pad(f"{flag(code)} {code}", 7, right=False),
+                             _pad(f"{amount:,.2f}", 10), _pad(fx(avg, cur), 9),
+                             _pad(fx(q.price, cur) if q else "-", 9),
+                             _pad(f"{pnl:+,.0f}" if pnl is not None else "-", 8)]))
+    return ("💰 보유 현황\n"
+            "(수량 / 평균 / 현재 / 손익)\n\n"
+            f"<pre>{html.escape(chr(10).join(body), quote=False)}</pre>\n\n"
+            f"총 원가 {won(cost_sum)}\n"
+            f"총 평가손익 {won(total)}")
 
 
 def rates_text(cfg: Config, quotes: dict[str, Quote]) -> str:
@@ -197,17 +203,18 @@ def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
 
 
 def signals_text(side: str, signals: list[Signal], cfg: Config) -> str:
-    """매도 신호를 메시지 하나로 정리. 하위 % 오름차순, 같은 %는 오를 가능성 높은 통화 순."""
+    """매도 신호를 고정폭 표 하나로 (환율 / 하위 % / 예상 이익). 하위 % 오름차순."""
     sigs = sort_signals([s for s in signals if s.side == side])
     if not sigs:
         return "🔴 매도 신호 없음"
-    lines = [f"🔴 매도 신호 {len(sigs)}건 (최근 {cfg.strategy.lookback_days}일 하위 % 낮은 순)"]
-    for n, sig in enumerate(sigs, 1):
-        cur = cfg.currencies[sig.code]
-        lines.append(f"{n}. {label(cur)} {fx(sig.price, cur)} · 하위 {sig.percentile:.0f}% "
-                     f"[{fx(sig.low, cur)}~{fx(sig.high, cur)}] · 예상 이익 {won(sig.profit)}")
-    lines.append("기록: '매도 통화 환율 수량'")
-    return "\n".join(lines)
+    body = ["".join([_pad(f"{flag(sig.code)} {sig.code}", 7, right=False),
+                     _pad(fx(sig.price, cfg.currencies[sig.code]), 10),
+                     _pad(f"{sig.percentile:.0f}%", 5), _pad(f"{sig.profit:+,.0f}", 9)])
+            for sig in sigs]
+    return (f"🔴 매도 신호 {len(sigs)}건\n"
+            "(환율 / 하위 % / 예상 이익)\n\n"
+            f"<pre>{html.escape(chr(10).join(body), quote=False)}</pre>\n\n"
+            "기록: '매도 통화 환율 수량'")
 
 
 def signal_text(sig: Signal, cur: Currency, cfg: Config) -> str:
