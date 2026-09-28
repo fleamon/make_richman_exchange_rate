@@ -78,7 +78,7 @@ def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
     quotes = {"USD": mk("USD", 100), "EUR": mk("EUR", 100), "JPY": mk("JPY", 100), "GBP": mk("GBP", 159)}
     body = bot._buy_rows(cfg, quotes)
     assert [l.split()[1] for l in body[1:]] == ["EUR", "JPY", "USD", "GBP"]  # 하위 0% 셋(확률 순) → 하위 98%
-    assert body[0].split() == [f"{h}d" for h in odds.HORIZONS]               # 머리글은 1d 3d 5d 10d 20d
+    assert body[0].split() == ["하위%"] + [f"{h}d" for h in odds.HORIZONS]     # 머리글은 하위% 1d 3d 5d 10d 20d
 
 
 def test_buy_table_columns_are_aligned(monkeypatch):
