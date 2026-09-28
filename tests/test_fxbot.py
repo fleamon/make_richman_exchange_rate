@@ -158,7 +158,6 @@ def test_signal_slot_is_hourly_kst():
 
 def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
     from fxbot import odds
-    from fxbot.bot import buy_text
     cfg = config.load()
     pooled = {str(b): [0.5, 1000] for b in range(5)}
     table = {"horizons": list(odds.HORIZONS),
@@ -169,7 +168,7 @@ def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
     hist = [100.0 + i for i in range(60)]
     mk = lambda c, p: Quote(c, p, hist, NOW)
     quotes = {"USD": mk("USD", 100), "EUR": mk("EUR", 100), "JPY": mk("JPY", 100), "GBP": mk("GBP", 159)}
-    body = table_lines(buy_text(cfg, quotes))
+    body = bot._buy_rows(cfg, quotes)
     assert [l.split()[1] for l in body[1:]] == ["EUR", "JPY", "USD", "GBP"]  # 하위 0% 셋(확률 순) → 하위 98%
     assert body[0].split()[-5:] == [str(h) for h in odds.HORIZONS]
     assert all(len(l) == len(body[0]) or True for l in body)
@@ -181,7 +180,7 @@ def test_buy_table_columns_are_aligned(monkeypatch):
     monkeypatch.setattr(odds, "load", lambda: {})
     hist = [100.0 + i for i in range(60)]
     quotes = {c: Quote(c, 100.0 + i, hist, NOW) for i, c in enumerate(("USD", "JPY", "IDR"))}
-    body = table_lines(bot.buy_text(cfg, quotes))
+    body = bot._buy_rows(cfg, quotes)
     assert len({bot._width(l) for l in body}) == 1                   # 모든 줄의 표시 폭이 같다
 
 

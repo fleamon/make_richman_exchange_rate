@@ -70,8 +70,8 @@ TABLE_WIDTH = 36   # 모든 표의 줄 폭을 같게 둬야 텔레그램이 코�
 
 
 def _table(rows: list[str]) -> str:
-    """고정폭 표. 줄 끝 공백은 텔레그램이 버리므로 마지막 칸은 항상 숫자로 끝나게 오른쪽 정렬한다."""
-    body = "\n".join(_pad(r.rstrip(), TABLE_WIDTH) for r in rows)
+    """고정폭 표 하나. 줄 끝 공백은 텔레그램이 버리므로 각 행은 숫자로 끝나게 만들어 둔다."""
+    body = "\n".join(r.rstrip() for r in rows)
     return f"<pre>{html.escape(body, quote=False)}</pre>"
 
 
@@ -140,11 +140,9 @@ def handle(text: str, state: dict, cfg: Config, quotes: dict[str, Quote], now: d
     return HELP
 
 
-def status_text(state: dict, cfg: Config, quotes: dict[str, Quote]) -> str:
-    """보유 통화를 고정폭 표로 (수량 / 평균 매수 환율 / 현재 환율 / 평가손익)."""
+def _status_rows(state: dict, cfg: Config, quotes: dict[str, Quote]) -> tuple[list[str], float, float]:
+    """보유 통화 행들과 (총 원가, 총 평가손익). 통화 7 + 수량 10 + 평균 9 + 손익 10 = 36칸."""
     lots = replay(state["trades"], cfg.currencies)
-    if not lots:
-        return "보유 중인 외화가 없습니다."
     body, total, cost_sum = [], 0.0, 0.0
     for code, ls in lots.items():
         cur, q = cfg.currencies[code], quotes.get(code)
@@ -156,6 +154,14 @@ def status_text(state: dict, cfg: Config, quotes: dict[str, Quote]) -> str:
         body.append("".join([_pad(f"{flag(code)} {code}", 7, right=False),
                              _pad(f"{amount:,.2f}", 10), _pad(fx(avg, cur), 9),
                              _pad(f"{pnl:+,.0f}" if pnl is not None else "-", 10)]))
+    return body, cost_sum, total
+
+
+def status_text(state: dict, cfg: Config, quotes: dict[str, Quote]) -> str:
+    """'현황' 명령 응답: 보유 통화 표와 합계."""
+    body, cost_sum, total = _status_rows(state, cfg, quotes)
+    if not body:
+        return "보유 중인 외화가 없습니다."
     return ("💰 보유 현황\n"
             "(수량 / 평균 매수가 / 평가손익)\n\n"
             f"{_table(body)}\n\n"
@@ -175,17 +181,12 @@ def rates_text(cfg: Config, quotes: dict[str, Quote]) -> str:
     return "\n".join(lines)
 
 
-def header_text(now: datetime) -> str:
-    kst = now + timedelta(hours=9)
-    return f"━━━━━━━━━━━━━━━\n📍 {kst:%m/%d %H:%M} 최신 신호\n(이 메시지 아래가 가장 최근 알림입니다)\n━━━━━━━━━━━━━━━"
-
-
-def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
-    """전 통화를 하위 % 오름차순 고정폭 표로 (같은 %는 단기 확률 높은 순).
+def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[str]:
+    """전 통화 행들 (머리글 포함). 하위 % 오름차순, 같은 %는 단기 확률 높은 순.
 
     표 안에는 한글을 넣지 않는다 — 휴대폰 고정폭 글꼴에서 한글 폭이 일정하지 않아 열이 밀린다.
+    통화 7 + 환율 9 + 하위 4 + 확률 16 = 36칸.
     """
-    days = cfg.strategy.lookback_days
     table = odds.load()
     rank = {c: i for i, c in enumerate(PRIORITY)}
     rows = []
@@ -201,28 +202,43 @@ def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
         cells += [_pad(f"{probs[h] * 100:.0f}" if h in probs else "-", 4 if i == 0 else 3)
                   for i, h in enumerate(odds.HORIZONS)]
         body.append("".join(cells))
+    return body
+
+
+def _sell_rows(signals: list[Signal], cfg: Config) -> list[str]:
+    """매도 신호 행들. 통화 7 + 환율 9 + 하위 4 + 예상 이익 16 = 36칸."""
+    return ["".join([_pad(f"{flag(sig.code)} {sig.code}", 7, right=False),
+                     _pad(fx(sig.price, cfg.currencies[sig.code]), 9),
+                     _pad(f"{sig.percentile:.0f}%", 4), _pad(f"{sig.profit:+,.0f}", 16)])
+            for sig in sort_signals([s for s in signals if s.side == "sell"])]
+
+
+def report_text(now: datetime, cfg: Config, quotes: dict[str, Quote],
+                state: dict, signals: list[Signal]) -> str:
+    """매수·보유·매도를 코드 블록 하나에 담은 정기 알림.
+
+    블록을 하나만 쓰는 이유: 텔레그램이 코드 블록마다 글꼴을 따로 줄여서, 나눠 보내면
+    표끼리 글자 크기와 줄 간격이 달라진다.
+    """
+    kst = now + timedelta(hours=9)
+    days = cfg.strategy.lookback_days
+    held, cost_sum, total = _status_rows(state, cfg, quotes)
+    sells = _sell_rows(signals, cfg)
+
+    block = [f"[매수] {days}일 중 하위 % 낮은 순", *_buy_rows(cfg, quotes), "",
+             "[보유] 수량 / 평균가 / 평가손익"]
+    block += held or ["  보유 없음"]
+    if held:
+        block.append(f"  원가 {cost_sum:,.0f}  손익 {total:+,.0f}")
+    block += ["", "[매도] 환율 / 하위 % / 예상이익"]
+    block += sells or ["  신호 없음"]
 
     note = [f"※ 하위 % = 최근 {days}일 중 위치 (0%=최저)",
             "※ 1~20 = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용",
             "기록: '매수 통화 환율 수량'"]
-    return (f"🟢 매수 신호 · {len(rows)}개 통화\n\n{_table(body)}\n\n"
+    return (f"📍 {kst:%m/%d %H:%M} 환율 신호\n\n{_table(block)}\n\n"
             + html.escape("\n".join(note), quote=False))
-
-
-def signals_text(side: str, signals: list[Signal], cfg: Config) -> str:
-    """매도 신호를 고정폭 표 하나로 (환율 / 하위 % / 예상 이익). 하위 % 오름차순."""
-    sigs = sort_signals([s for s in signals if s.side == side])
-    if not sigs:
-        return "🔴 매도 신호 없음"
-    body = ["".join([_pad(f"{flag(sig.code)} {sig.code}", 7, right=False),
-                     _pad(fx(sig.price, cfg.currencies[sig.code]), 9),
-                     _pad(f"{sig.percentile:.0f}%", 4), _pad(f"{sig.profit:+,.0f}", 16)])
-            for sig in sigs]
-    return (f"🔴 매도 신호 {len(sigs)}건\n"
-            "(환율 / 하위 % / 예상 이익)\n\n"
-            f"{_table(body)}\n\n"
-            "기록: '매도 통화 환율 수량'")
 
 
 def signal_text(sig: Signal, cur: Currency, cfg: Config) -> str:
