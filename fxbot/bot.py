@@ -79,15 +79,18 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[tuple[str, str]]:
     rows.sort(key=lambda r: (round(r[1]), -(r[0].get(odds.RANK_HORIZON) or 0), rank.get(r[2].code, len(rank))))
 
     prices = {q.code: fx(q.price, cfg.currencies[q.code]) for _, _, q in rows}
-    w = max([8, *map(len, prices.values())])   # 환율이 8자를 넘으면 열을 넓혀 줄을 맞춘다
+    lows = {q.code: f"{pct:.0f}%" for _, pct, q in rows}
+    # 환율·L% 열은 가장 긴 값에 딱 맞춘다 (남는 빈칸 없이, 짧은 값만 앞에 공백을 채워 줄을 맞춘다)
+    w = max([len("RATE"), *map(len, prices.values())])
+    lw = max([len("L%"), *map(len, lows.values())])
     # 확률 열은 사이 공백 없이 폭만 준다 — 한 줄이 휴대폰 폭을 넘어 두 줄로 꺾이지 않게.
     # '10d' '20d' 머리글이 붙어 보이지 않게 뒤 두 열만 한 칸 넓다.
-    fmt = lambda ccy, rate, low, ups: (f"{ccy:<3} {rate:>{w}} {low:>4}"
+    fmt = lambda ccy, rate, low, ups: (f"{ccy:<3} {rate:>{w}} {low:>{lw}}"
                                        + "".join(f"{u:>{pw}}" for u, pw in zip(ups, PROB_W)))
-    body = [(HEADER_ICON, fmt("CCY", "RATE", "LOW%", [f"{h}d" for h in odds.HORIZONS]))]
+    body = [(HEADER_ICON, fmt("CCY", "RATE", "L%", [f"{h}d" for h in odds.HORIZONS]))]
     for probs, pct, q in rows:
         ups = [f"{probs[h] * 100:.0f}" if h in probs else "-" for h in odds.HORIZONS]
-        body.append((flag(q.code), fmt(q.code, prices[q.code], f"{pct:.0f}%", ups)))
+        body.append((flag(q.code), fmt(q.code, prices[q.code], lows[q.code], ups)))
     return body
 
 
@@ -99,7 +102,7 @@ def report_text(now: datetime, cfg: Config, quotes: dict[str, Quote]) -> str:
     """
     kst = now + timedelta(hours=9)
     days = cfg.strategy.lookback_days
-    note = [f"※ LOW% = 최근 {days}일 중 위치 (0%=최저)",
+    note = [f"※ L% = 최근 {days}일 중 위치 (0%=최저)",
             "※ 1d~20d = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용"]
     table = "\n".join(f"{icon} <code>{html.escape(row)}</code>" for icon, row in _buy_rows(cfg, quotes))
