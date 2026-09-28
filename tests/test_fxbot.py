@@ -61,7 +61,7 @@ def test_report_has_only_time_and_buy_table():
     text = bot.report_text(NOW, config.load(), quotes)
     assert text.startswith("📍 09/24 09:00 환율")
     assert "보유" not in text and "매도" not in text
-    assert text.count("<pre>") == text.count("</pre>") == 1   # 표는 코드 블록 하나
+    assert "<pre>" not in text and "&" not in text   # 코드 블록·HTML 이스케이프 없이 일반 텍스트
 
 
 def test_buy_text_is_table_sorted_by_percentile(monkeypatch):

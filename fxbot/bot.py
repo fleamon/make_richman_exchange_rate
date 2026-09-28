@@ -4,7 +4,6 @@
 이 봇은 알려주기만 한다 — 매수·보유 기록은 하지 않는다.
 """
 
-import html
 from datetime import datetime, timedelta
 
 from . import odds
@@ -59,7 +58,7 @@ def rates_text(cfg: Config, quotes: dict[str, Quote]) -> str:
 def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[str]:
     """전 통화 행들 (머리글·구분선 포함). 하위 % 오름차순, 같은 %는 단기 확률 높은 순.
 
-    코드 블록(고정폭)에 넣으므로 영문·숫자만 쓴다 — 국기·한글은 폭이 일정하지 않아 열이 밀린다.
+    영문·숫자만 쓴다 — 국기·한글은 폭이 일정하지 않아 열이 더 밀린다.
     """
     table = odds.load()
     rank = {c: i for i, c in enumerate(PRIORITY)}
@@ -80,11 +79,14 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[str]:
 
 
 def report_text(now: datetime, cfg: Config, quotes: dict[str, Quote]) -> str:
-    """정기 알림: 날짜·시간과 전 통화 매수 확률 표 (표는 코드 블록 <pre> 로 열을 맞춘다)."""
+    """정기 알림: 날짜·시간과 전 통화 매수 확률 표.
+
+    코드 블록(<pre>) 없이 일반 텍스트로 보낸다 — 가변폭 글꼴이라 열이 딱 맞지는 않는다.
+    """
     kst = now + timedelta(hours=9)
     days = cfg.strategy.lookback_days
     note = [f"※ LOW% = 최근 {days}일 중 위치 (0%=최저)",
             "※ 1d~20d = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용"]
-    table = html.escape("\n".join(_buy_rows(cfg, quotes)))
-    return f"📍 {kst:%m/%d %H:%M} 환율 (하위% 낮은 순)\n<pre>{table}</pre>\n" + "\n".join(note)
+    table = "\n".join(_buy_rows(cfg, quotes))
+    return f"📍 {kst:%m/%d %H:%M} 환율 (하위% 낮은 순)\n{table}\n" + "\n".join(note)
