@@ -125,8 +125,8 @@ def test_history_shows_average_of_holdings():
     rows = {l.split()[1]: l.split()[1:] for l in
             text[text.index("<pre>") + 5 : text.index("</pre>")].splitlines()}
     # 선입선출로 900원 5만엔 + 880원 10만엔이 남음 → 평균 886.67
-    assert rows["JPY"] == ["JPY", "150,000.00", "886.67", "-", "-"]
-    assert rows["USD"] == ["USD", "10.00", "1,300.00", "1,310.00", "+100"]
+    assert rows["JPY"] == ["JPY", "150,000.00", "886.67", "-"]
+    assert rows["USD"] == ["USD", "10.00", "1,300.00", "+100"]
     assert "총 원가 1,343,000원" in text and "총 평가손익 100원" in text
     assert bot.handle("기록", st, CFG, {}, NOW) == bot.handle("현황", st, CFG, {}, NOW)
 
@@ -167,7 +167,7 @@ def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
     text = buy_text(cfg, quotes)
     body = text[text.index("<pre>") + 5 : text.index("</pre>")].splitlines()
     assert [l.split()[1] for l in body[1:]] == ["EUR", "JPY", "USD", "GBP"]  # 하위 0% 셋(확률 순) → 하위 98%
-    assert body[0].split()[-5:] == [f"{h}d" for h in odds.HORIZONS]
+    assert body[0].split()[-5:] == [str(h) for h in odds.HORIZONS]
     assert all(len(l) == len(body[0]) or True for l in body)
 
 
