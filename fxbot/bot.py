@@ -66,6 +66,14 @@ def _pad(s: str, width: int, right: bool = True) -> str:
     return fill + s if right else s + fill
 
 
+TABLE_WIDTH = 42   # 모든 표의 줄 폭을 같게 둬야 텔레그램이 코드 블록을 같은 글꼴 크기로 그린다
+
+
+def _table(rows: list[str]) -> str:
+    body = "\n".join(_pad(r, TABLE_WIDTH, right=False) for r in rows)
+    return f"<pre>{html.escape(body, quote=False)}</pre>"
+
+
 def _num(s: str) -> float:
     v = float(s.replace(",", ""))
     if not math.isfinite(v) or v <= 0:
@@ -147,10 +155,10 @@ def status_text(state: dict, cfg: Config, quotes: dict[str, Quote]) -> str:
         body.append("".join([_pad(f"{flag(code)} {code}", 7, right=False),
                              _pad(f"{amount:,.2f}", 10), _pad(fx(avg, cur), 9),
                              _pad(fx(q.price, cur) if q else "-", 9),
-                             _pad(f"{pnl:+,.0f}" if pnl is not None else "-", 8)]))
+                             _pad(f"{pnl:+,.0f}" if pnl is not None else "-", 7)]))
     return ("💰 보유 현황\n"
             "(수량 / 평균 / 현재 / 손익)\n\n"
-            f"<pre>{html.escape(chr(10).join(body), quote=False)}</pre>\n\n"
+            f"{_table(body)}\n\n"
             f"총 원가 {won(cost_sum)}\n"
             f"총 평가손익 {won(total)}")
 
@@ -197,8 +205,7 @@ def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
             "※ 1d~20d = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용",
             "기록: '매수 통화 환율 수량'"]
-    return (f"🟢 매수 신호 · {len(rows)}개 통화\n\n"
-            f"<pre>{html.escape(chr(10).join(body), quote=False)}</pre>\n\n"
+    return (f"🟢 매수 신호 · {len(rows)}개 통화\n\n{_table(body)}\n\n"
             + html.escape("\n".join(note), quote=False))
 
 
@@ -213,7 +220,7 @@ def signals_text(side: str, signals: list[Signal], cfg: Config) -> str:
             for sig in sigs]
     return (f"🔴 매도 신호 {len(sigs)}건\n"
             "(환율 / 하위 % / 예상 이익)\n\n"
-            f"<pre>{html.escape(chr(10).join(body), quote=False)}</pre>\n\n"
+            f"{_table(body)}\n\n"
             "기록: '매도 통화 환율 수량'")
 
 
