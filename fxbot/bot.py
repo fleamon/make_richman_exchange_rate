@@ -79,7 +79,7 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[str]:
     """전 통화 행들 (머리글 포함). 하위 % 오름차순, 같은 %는 단기 확률 높은 순.
 
     본문 행에는 한글을 넣지 않는다 — 휴대폰 고정폭 글꼴에서 한글 폭이 일정하지 않아 열이 밀린다.
-    머리글의 '하위%' 만 예외로, 두 칸 폭으로 계산해 확률 머리글 위치는 그대로 둔다.
+    머리글의 '하위%' 만 예외로, 두 칸 폭으로 계산한 뒤 눈에 맞게 공백을 더 넣는다.
     통화 7 + 환율 9 + 하위 4 + 확률 17 = 37칸.
     """
     table = odds.load()
@@ -90,7 +90,9 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[str]:
         rows.append((odds.probabilities(table, q.code, pct), pct, q))
     rows.sort(key=lambda r: (round(r[1]), -(r[0].get(odds.RANK_HORIZON) or 0), rank.get(r[2].code, len(rank))))
 
-    body = [_pad("하위%", 20) + "".join(_pad(f"{h}d", w) for h, w in zip(odds.HORIZONS, PROB_W))]
+    # 머리글만 앞에 공백 7칸을 더 둔다 — 텔레그램 일반 텍스트(가변폭)에서는 숫자·국기보다
+    # 공백이 좁게 그려져, 칸 수를 맞추면 오히려 머리글이 왼쪽으로 쏠려 보인다.
+    body = [_pad("하위%", 27) + "".join(_pad(f"{h}d", w) for h, w in zip(odds.HORIZONS, PROB_W))]
     for probs, pct, q in rows:
         cells = [_pad(f"{flag(q.code)} {q.code}", 7, right=False),
                  _pad(fx(q.price, cfg.currencies[q.code]), 9), _pad(f"{pct:.0f}%", 4)]

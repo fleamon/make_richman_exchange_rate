@@ -88,7 +88,8 @@ def test_buy_table_columns_are_aligned(monkeypatch):
     hist = [100.0 + i for i in range(60)]
     quotes = {c: Quote(c, 100.0 + i, hist, NOW) for i, c in enumerate(("USD", "JPY", "IDR"))}
     body = bot._buy_rows(cfg, quotes)
-    assert len({bot._width(l) for l in body}) == 1                   # 모든 줄의 표시 폭이 같다
+    assert len({bot._width(l) for l in body[1:]}) == 1               # 통화 줄은 모두 표시 폭이 같다
+    assert bot._width(body[0]) > bot._width(body[1])                 # 머리글만 일부러 오른쪽으로 밀어둔다
 
 
 def test_probability_shrinks_toward_pooled():
