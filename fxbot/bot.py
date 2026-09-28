@@ -78,7 +78,8 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote]) -> list[tuple[str, str]]:
         rows.append((odds.probabilities(table, q.code, pct), pct, q))
     rows.sort(key=lambda r: (round(r[1]), -(r[0].get(odds.RANK_HORIZON) or 0), rank.get(r[2].code, len(rank))))
 
-    prices = {q.code: fx(q.price, cfg.currencies[q.code]) for _, _, q in rows}
+    # 표에서는 천 단위 쉼표를 뺀다 — 환율 열이 한 칸 줄어 통화 코드와 환율 사이 빈칸이 준다
+    prices = {q.code: fx(q.price, cfg.currencies[q.code]).replace(",", "") for _, _, q in rows}
     lows = {q.code: f"{pct:.0f}%" for _, pct, q in rows}
     # 환율·L% 열은 가장 긴 값에 딱 맞춘다 (남는 빈칸 없이, 짧은 값만 앞에 공백을 채워 줄을 맞춘다)
     w = max([len("RATE"), *map(len, prices.values())])
