@@ -3,7 +3,7 @@
 run    : (GitHub Actions) 텔레그램 기록 명령 처리 → 환율 조회 → 신호 알림 → 암호화 상태 저장
 keygen : STATE_KEY 로 쓸 암호화 키 생성
 chatid : TELEGRAM_TOKEN 으로 봇에 온 메시지의 chat id 출력 (최초 설정용)
-backtest: 과거 10년 환율로 '하위 % 구간별 30일 뒤 상승 확률' 표(fxbot/odds.json) 재생성
+backtest: 과거 10년 환율로 '하위 % 구간별 1·3·5·10·20거래일 뒤 상승 확률' 표(fxbot/odds.json) 재생성
 rates  : 현재 환율과 3개월 위치를 화면에 출력 (로컬 확인용)
 
 공개 저장소의 Actions 로그는 누구나 볼 수 있으므로, run 은 보유·거래 정보를 로그에 출력하지 않는다.

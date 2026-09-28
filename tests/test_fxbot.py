@@ -152,8 +152,11 @@ def test_buy_text_sorted_by_odds_then_percentile(monkeypatch):
     from fxbot import odds
     from fxbot.bot import buy_text
     cfg = config.load()
-    table = {"pooled": {str(b): [0.5, 1000] for b in range(5)},
-             "currency": {"EUR": {"0": [0.7, 100000]}, "USD": {"0": [0.4, 100000]}}}
+    pooled = {str(b): [0.5, 1000] for b in range(5)}
+    table = {"horizons": list(odds.HORIZONS),
+             "pooled": {str(h): pooled for h in odds.HORIZONS},
+             "currency": {"EUR": {str(h): {"0": [0.7, 100000]} for h in odds.HORIZONS},
+                          "USD": {str(h): {"0": [0.4, 100000]} for h in odds.HORIZONS}}}
     monkeypatch.setattr(odds, "load", lambda: table)
     hist = [100.0 + i for i in range(60)]
     mk = lambda c, p: Quote(c, p, hist, NOW)
@@ -164,8 +167,28 @@ def test_buy_text_sorted_by_odds_then_percentile(monkeypatch):
 
 def test_probability_shrinks_toward_pooled():
     from fxbot import odds
-    table = {"pooled": {"0": [0.5, 1000]}, "currency": {"X": {"0": [0.9, 400]}, "Y": {"0": [0.9, 4]}}}
+    h = str(odds.RANK_HORIZON)
+    table = {"pooled": {h: {"0": [0.5, 1000]}},
+             "currency": {"X": {h: {"0": [0.9, 400]}}, "Y": {h: {"0": [0.9, 4]}}}}
     assert abs(odds.probability(table, "X", 0) - 0.7) < 1e-9
     assert abs(odds.probability(table, "Y", 0) - 0.5) < 0.01
     assert odds.probability(table, "Z", 0) == 0.5
     assert odds.probability({}, "X", 0) is None
+    assert odds.probability(table, "X", 0, horizon=1) is None       # 표에 없는 구간
+    assert odds.probabilities(table, "X", 0) == {odds.RANK_HORIZON: 0.7}
+
+
+def test_build_counts_every_horizon():
+    from datetime import date, timedelta
+    from fxbot import odds
+    day0 = date(2020, 1, 1)
+    rows = [(day0 + timedelta(days=i), 100.0 + i) for i in range(400)]   # 계속 오르는 환율
+    table = odds.build({"USD": rows}, 180)
+    assert table["horizons"] == list(odds.HORIZONS)
+    counted = {}
+    for h in odds.HORIZONS:
+        cells = table["currency"]["USD"][str(h)]
+        assert cells, h
+        assert all(p == 1.0 for p, _ in cells.values())                  # 오름 추세면 모두 상승
+        counted[h] = sum(n for _, n in cells.values())
+    assert counted[1] > counted[20] > 0                                  # 먼 구간일수록 셀 수 있는 날이 적다
