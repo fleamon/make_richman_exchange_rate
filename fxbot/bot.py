@@ -152,7 +152,7 @@ def status_text(state: dict, cfg: Config, quotes: dict[str, Quote]) -> str:
         body.append("".join([_pad(code, 4, right=False),
                              _pad(f"{amount:,.2f}", 10), _pad(fx(avg, cur), 9),
                              _pad(f"{pnl:+,.0f}" if pnl is not None else "-", 10)]))
-    return ("💰 보유 현황\n"
+    return ("[2안] 보유 현황\n"
             "(수량 / 평균 매수가 / 평가손익)\n\n"
             f"{_table(body)}\n\n"
             f"총 원가 {won(cost_sum)}\n"
@@ -202,7 +202,7 @@ def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
             "※ 1~20 = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용",
             "기록: '매수 통화 환율 수량'"]
-    return (f"🟢 매수 신호 · {len(rows)}개 통화\n\n{_table(body)}\n\n"
+    return (f"[2안] 매수 신호 · {len(rows)}개 통화\n\n{_table(body)}\n\n"
             + html.escape("\n".join(note), quote=False))
 
 
@@ -210,12 +210,12 @@ def signals_text(side: str, signals: list[Signal], cfg: Config) -> str:
     """매도 신호를 고정폭 표 하나로 (환율 / 하위 % / 예상 이익). 하위 % 오름차순."""
     sigs = sort_signals([s for s in signals if s.side == side])
     if not sigs:
-        return "🔴 매도 신호 없음"
+        return "[2안] 매도 신호 없음"
     body = ["".join([_pad(sig.code, 4, right=False),
                      _pad(fx(sig.price, cfg.currencies[sig.code]), 9),
                      _pad(f"{sig.percentile:.0f}%", 4), _pad(f"{sig.profit:+,.0f}", 16)])
             for sig in sigs]
-    return (f"🔴 매도 신호 {len(sigs)}건\n"
+    return (f"[2안] 매도 신호 {len(sigs)}건\n"
             "(환율 / 하위 % / 예상 이익)\n\n"
             f"{_table(body)}\n\n"
             "기록: '매도 통화 환율 수량'")
