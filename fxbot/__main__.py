@@ -1,6 +1,6 @@
 """python -m fxbot [run|keygen|chatid|rates|backtest]
 
-run    : (GitHub Actions) 텔레그램 명령 처리 → 환율 조회 → 매수 확률 알림 → 암호화 상태 저장
+run    : (GitHub Actions) 환율 조회 → 정기 알림 또는 받은 메시지에 매수 확률 표 → 암호화 상태 저장
 keygen : STATE_KEY 로 쓸 암호화 키 생성
 chatid : TELEGRAM_TOKEN 으로 봇에 온 메시지의 chat id 출력 (최초 설정용)
 backtest: 과거 10년 환율로 '하위 % 구간별 1·3·5·10·20거래일 뒤 상승 확률' 표(fxbot/odds.json) 재생성
@@ -14,7 +14,7 @@ import sys
 from datetime import datetime, timezone
 
 from . import config, odds, rates, state, strategy
-from .bot import handle, rates_text, report_text
+from .bot import rates_text, report_text
 from .telegram import Telegram
 
 
@@ -31,20 +31,18 @@ def run() -> None:
         print("TELEGRAM_TOKEN / TELEGRAM_CHAT_ID 가 없어 알림·명령 처리를 건너뜁니다.")
     else:
         texts, st["tg_offset"] = tg.updates(st["tg_offset"])
-        for text in texts:
-            tg.send(handle(text, cfg, quotes, now))
-        # 뒤의 알림 발송이 실패해도 같은 명령을 다음 실행에 또 처리하지 않게 먼저 저장한다
+        # 뒤의 발송이 실패해도 같은 메시지를 다음 실행에 또 처리하지 않게 먼저 저장한다
         if state.dumps(st) != before:
             state.save(st)
 
+        # 무슨 말을 보내든(여러 통이어도) 신호 표 한 통으로 답한다. 정기 알림과 겹치면 그것도 한 통으로 끝낸다.
         slot = strategy.signal_slot(now)
-        if st.get("signal_slot") != slot or os.environ.get("FORCE_SIGNAL"):
+        asked = bool(texts) or bool(os.environ.get("TEST_COMMAND"))
+        if asked or st.get("signal_slot") != slot or os.environ.get("FORCE_SIGNAL"):
             tg.send(report_text(now, cfg, quotes))
             st["signal_slot"] = slot
         if os.environ.get("TEST_LOW_SHIFT"):   # 표 모양 확인용 테스트 메시지 (하위 % 를 올려서)
             tg.send(report_text(now, cfg, quotes, low_shift=float(os.environ["TEST_LOW_SHIFT"]), test=True))
-        if os.environ.get("TEST_COMMAND"):     # 명령 답장 확인용 — 이 말을 받은 것처럼 답한다
-            tg.send(handle(os.environ["TEST_COMMAND"], cfg, quotes, now))
     st.pop("alerts", None)
 
     # 공개 로그라 명령·알림 건수나 상태 변경 여부도 남기지 않는다

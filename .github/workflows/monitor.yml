@@ -16,7 +16,7 @@ on:
         type: string
         default: ""
       test_command:
-        description: "명령 답장 확인용 — 이 말을 텔레그램으로 받은 것처럼 답한다 (예: 도움말, 비우면 안 보냄)"
+        description: "메시지 답장 확인용 — 아무 말이나 넣으면 메시지를 받은 것처럼 신호 표로 답한다 (비우면 안 보냄)"
         type: string
         default: ""
 

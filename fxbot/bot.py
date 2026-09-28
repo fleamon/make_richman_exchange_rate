@@ -12,17 +12,6 @@ from .config import Config, Currency
 from .rates import Quote
 from .strategy import PRIORITY, percentile
 
-HELP = """환율 알림 봇
-신호 — 전 통화 환율·매수 확률 표 지금 보기
-(/signal 도 가능)"""
-
-ALIASES = {
-    "신호": "signal", "signal": "signal",
-    "환율": "signal", "rates": "signal",   # 예전 '환율' 명령도 같은 표로 답한다
-    "도움말": "help", "help": "help", "start": "help",
-}
-
-
 def fx(v: float, cur: Currency) -> str:
     """1단위당 원화 → 토스 표시 단위 문자열."""
     q = v * cur.unit
@@ -31,14 +20,6 @@ def fx(v: float, cur: Currency) -> str:
 
 def label(cur: Currency) -> str:
     return f"{cur.code}({cur.name})"
-
-
-def handle(text: str, cfg: Config, quotes: dict[str, Quote], now: datetime) -> str:
-    parts = text.strip().lstrip("/").split()
-    cmd = ALIASES.get(parts[0].split("@")[0].lower()) if parts else None
-    if cmd == "signal":
-        return report_text(now, cfg, quotes)
-    return HELP
 
 
 def rates_text(cfg: Config, quotes: dict[str, Quote]) -> str:
