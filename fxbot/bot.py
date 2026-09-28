@@ -167,7 +167,10 @@ def header_text(now: datetime) -> str:
 
 
 def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
-    """전 통화를 하위 % 오름차순 고정폭 표로 (같은 %는 단기 확률 높은 순). 텔레그램은 <pre> 로 열을 맞춘다."""
+    """전 통화를 하위 % 오름차순 고정폭 표로 (같은 %는 단기 확률 높은 순).
+
+    표 안에는 한글을 넣지 않는다 — 휴대폰 고정폭 글꼴에서 한글 폭이 일정하지 않아 열이 밀린다.
+    """
     days = cfg.strategy.lookback_days
     table = odds.load()
     rank = {c: i for i, c in enumerate(PRIORITY)}
@@ -177,21 +180,20 @@ def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
         rows.append((odds.probabilities(table, q.code, pct), pct, q))
     rows.sort(key=lambda r: (round(r[1]), -(r[0].get(odds.RANK_HORIZON) or 0), rank.get(r[2].code, len(rank))))
 
-    head = [_pad("통화", 7, right=False), _pad("환율", 10), _pad("하위", 5)]
-    head += [_pad(f"{h}d", 4) for h in odds.HORIZONS]
-    body = [" ".join(head)]
+    body = [" " * 22 + "".join(_pad(f"{h}d", 4) for h in odds.HORIZONS)]
     for probs, pct, q in rows:
-        cur = cfg.currencies[q.code]
         cells = [_pad(f"{flag(q.code)} {q.code}", 7, right=False),
-                 _pad(fx(q.price, cur), 10), _pad(f"{pct:.0f}%", 5)]
+                 _pad(fx(q.price, cfg.currencies[q.code]), 10), _pad(f"{pct:.0f}%", 5)]
         cells += [_pad(f"{probs[h] * 100:.0f}" if h in probs else "-", 4) for h in odds.HORIZONS]
-        body.append(" ".join(cells))
+        body.append("".join(cells))
 
-    note = (f"※ 하위 % = 최근 {days}일 중 위치(0%=최저). 1d~20d = 과거 10년 동안 같은 하위 % 구간에서 "
-            f"그 거래일 뒤 올라 있던 비율(%). 정렬은 하위 % 낮은 순.\n"
-            "기록: '매수 통화 환율 수량'")
-    return (f"🟢 매수 신호 · {len(rows)}개 통화 (최근 {days}일 기준, 하위 % 낮은 순)\n"
-            f"<pre>{html.escape(chr(10).join(body), quote=False)}</pre>\n{html.escape(note, quote=False)}")
+    note = [f"※ 하위 % = 최근 {days}일 중 위치 (0%=최저)",
+            "※ 1d~20d = 그 거래일 뒤 오른 비율(%)",
+            "※ 과거 10년 같은 구간 기준 · 참고용",
+            "기록: '매수 통화 환율 수량'"]
+    return (f"🟢 매수 신호 · {len(rows)}개 통화\n\n"
+            f"<pre>{html.escape(chr(10).join(body), quote=False)}</pre>\n\n"
+            + html.escape("\n".join(note), quote=False))
 
 
 def signals_text(side: str, signals: list[Signal], cfg: Config) -> str:
