@@ -32,7 +32,7 @@ def test_bot_only_answers_rates_signal_and_help():
     quotes = {"JPY": quote("JPY", 9.0, 8, 10)}
     assert "900.00" in bot.handle("환율", CFG, quotes, NOW)         # 토스 표시 단위(100엔)
     assert "조회 실패" in bot.handle("/rates", CFG, {}, NOW)
-    assert "LOW%  \u20071d  \u20073d" in bot.handle("신호", CFG, quotes, NOW)
+    assert "LOW% 1d 3d 5d 10d 20d" in bot.handle("신호", CFG, quotes, NOW)
     for text in ("매수 USD 1350 1000", "현황", "기록", "취소", "아무말", ""):
         assert bot.handle(text, CFG, quotes, NOW) == bot.HELP
 
@@ -62,8 +62,7 @@ def test_report_has_only_time_and_buy_table():
     assert text.startswith("📍 09/24 09:00 환율")
     assert "보유" not in text and "매도" not in text
     assert "<pre>" not in text                                     # 코드 블록 없이
-    assert "<code>" not in text and "&" not in text                # 인라인 코드·HTML 없이 일반 텍스트
-    assert any(l.startswith("🇺🇸 ") and l.endswith("  USD") for l in text.split("\n"))  # 국기 앞, 코드 끝
+    assert "🇺🇸 <code>USD " in text and "🇯🇵 <code>JPY " in text      # 국기는 코드 밖, 줄마다 인라인 코드
 
 
 def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
@@ -79,9 +78,10 @@ def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
     mk = lambda c, p: Quote(c, p, hist, NOW)
     quotes = {"USD": mk("USD", 100), "EUR": mk("EUR", 100), "JPY": mk("JPY", 100), "GBP": mk("GBP", 159)}
     body = bot._buy_rows(cfg, quotes)
-    assert [l.split()[-1] for l in body[1:]] == ["EUR", "JPY", "USD", "GBP"]  # 하위 0% 셋(확률 순) → 하위 98%
-    assert body[0].replace(bot.FS, " ").split() == [bot.HEADER_ICON, "RATE", "LOW%"] + [f"{h}d" for h in odds.HORIZONS] + ["CCY"]
-    assert body[1].startswith(bot.flag("EUR") + " ")
+    assert [r.split()[0] for _, r in body[1:]] == ["EUR", "JPY", "USD", "GBP"]  # 하위 0% 셋(확률 순) → 하위 98%
+    assert body[0][0] == bot.HEADER_ICON
+    assert body[0][1].split() == ["CCY", "RATE", "LOW%"] + [f"{h}d" for h in odds.HORIZONS]
+    assert body[1][0] == bot.flag("EUR")
 
 
 def test_buy_table_columns_are_aligned(monkeypatch):
@@ -91,9 +91,8 @@ def test_buy_table_columns_are_aligned(monkeypatch):
     hist = [100.0 + i for i in range(60)]
     quotes = {c: Quote(c, 100.0 + i, hist, NOW) for i, c in enumerate(("USD", "JPY", "IDR"))}
     body = bot._buy_rows(cfg, quotes)
-    nums = [l.split(" ", 1)[1].rsplit("  ", 1)[0] for l in body[1:]]  # 국기·통화 코드를 뺀 숫자 열
-    assert len({len(n) for n in nums}) == 1                           # 숫자 열 글자 수가 줄마다 같다
-    assert all(set(n) <= set("0123456789.%- " + bot.FS) for n in nums)  # 숫자·숫자 폭 공백만 (쉼표 없음)
+    assert len({len(r) for _, r in body}) == 1                       # 머리글·통화 줄 폭이 같다
+    assert all(r.isascii() for _, r in body)                         # 고정폭에서 밀리는 국기·한글 없음
 
 
 def test_probability_shrinks_toward_pooled():
