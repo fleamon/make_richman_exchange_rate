@@ -32,7 +32,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # 워커가 같은 시각에 두 번 부르면 두 번째 실행은 concurrency 로 기다렸다 돈다. 기본값(부른 시점의 커밋)으로
+      # 받으면 앞 실행이 올린 상태를 못 봐서 정기 신호·답장을 한 번 더 보내므로, 실행 시점의 main 끝을 받는다.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
