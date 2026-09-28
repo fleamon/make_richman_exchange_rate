@@ -66,11 +66,12 @@ def _pad(s: str, width: int, right: bool = True) -> str:
     return fill + s if right else s + fill
 
 
-TABLE_WIDTH = 36   # 화면보다 넓으면 텔레그램이 코드 블록 글꼴을 줄인다 — 세 표를 모두 이 폭 안에 넣어 크기를 맞춘다
+TABLE_WIDTH = 36   # 모든 표의 줄 폭을 같게 둬야 텔레그램이 코드 블록을 같은 글꼴 크기로 그린다
 
 
 def _table(rows: list[str]) -> str:
-    body = "\n".join(_pad(r, TABLE_WIDTH, right=False) for r in rows)
+    """고정폭 표. 줄 끝 공백은 텔레그램이 버리므로 마지막 칸은 항상 숫자로 끝나게 오른쪽 정렬한다."""
+    body = "\n".join(_pad(r.rstrip(), TABLE_WIDTH) for r in rows)
     return f"<pre>{html.escape(body, quote=False)}</pre>"
 
 
@@ -154,7 +155,7 @@ def status_text(state: dict, cfg: Config, quotes: dict[str, Quote]) -> str:
         total += pnl or 0.0
         body.append("".join([_pad(f"{flag(code)} {code}", 7, right=False),
                              _pad(f"{amount:,.2f}", 10), _pad(fx(avg, cur), 9),
-                             _pad(f"{pnl:+,.0f}" if pnl is not None else "-", 8)]))
+                             _pad(f"{pnl:+,.0f}" if pnl is not None else "-", 10)]))
     return ("💰 보유 현황\n"
             "(수량 / 평균 매수가 / 평가손익)\n\n"
             f"{_table(body)}\n\n"
@@ -193,11 +194,12 @@ def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
         rows.append((odds.probabilities(table, q.code, pct), pct, q))
     rows.sort(key=lambda r: (round(r[1]), -(r[0].get(odds.RANK_HORIZON) or 0), rank.get(r[2].code, len(rank))))
 
-    body = [" " * 20 + "".join(_pad(str(h), 3) for h in odds.HORIZONS)]
+    body = [" " * 20 + "".join(_pad(str(h), 4 if i == 0 else 3) for i, h in enumerate(odds.HORIZONS))]
     for probs, pct, q in rows:
         cells = [_pad(f"{flag(q.code)} {q.code}", 7, right=False),
                  _pad(fx(q.price, cfg.currencies[q.code]), 9), _pad(f"{pct:.0f}%", 4)]
-        cells += [_pad(f"{probs[h] * 100:.0f}" if h in probs else "-", 3) for h in odds.HORIZONS]
+        cells += [_pad(f"{probs[h] * 100:.0f}" if h in probs else "-", 4 if i == 0 else 3)
+                  for i, h in enumerate(odds.HORIZONS)]
         body.append("".join(cells))
 
     note = [f"※ 하위 % = 최근 {days}일 중 위치 (0%=최저)",
@@ -215,7 +217,7 @@ def signals_text(side: str, signals: list[Signal], cfg: Config) -> str:
         return "🔴 매도 신호 없음"
     body = ["".join([_pad(f"{flag(sig.code)} {sig.code}", 7, right=False),
                      _pad(fx(sig.price, cfg.currencies[sig.code]), 9),
-                     _pad(f"{sig.percentile:.0f}%", 4), _pad(f"{sig.profit:+,.0f}", 8)])
+                     _pad(f"{sig.percentile:.0f}%", 4), _pad(f"{sig.profit:+,.0f}", 16)])
             for sig in sigs]
     return (f"🔴 매도 신호 {len(sigs)}건\n"
             "(환율 / 하위 % / 예상 이익)\n\n"
