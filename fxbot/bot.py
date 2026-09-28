@@ -13,13 +13,12 @@ from .rates import Quote
 from .strategy import PRIORITY, percentile
 
 HELP = """환율 알림 봇
-환율 — 전체 통화 현재 환율과 기간 내 위치
-신호 — 매수 확률 표 지금 보기
-(/rates /signal 도 가능)"""
+신호 — 전 통화 환율·매수 확률 표 지금 보기
+(/signal 도 가능)"""
 
 ALIASES = {
-    "환율": "rates", "rates": "rates",
     "신호": "signal", "signal": "signal",
+    "환율": "signal", "rates": "signal",   # 예전 '환율' 명령도 같은 표로 답한다
     "도움말": "help", "help": "help", "start": "help",
 }
 
@@ -37,8 +36,6 @@ def label(cur: Currency) -> str:
 def handle(text: str, cfg: Config, quotes: dict[str, Quote], now: datetime) -> str:
     parts = text.strip().lstrip("/").split()
     cmd = ALIASES.get(parts[0].split("@")[0].lower()) if parts else None
-    if cmd == "rates":
-        return rates_text(cfg, quotes)
     if cmd == "signal":
         return report_text(now, cfg, quotes)
     return HELP

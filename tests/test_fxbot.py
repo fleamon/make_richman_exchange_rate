@@ -30,9 +30,9 @@ def test_percentile_is_zero_at_period_low():
 
 def test_bot_only_answers_rates_signal_and_help():
     quotes = {"JPY": quote("JPY", 9.0, 8, 10)}
-    assert "900.00" in bot.handle("환율", CFG, quotes, NOW)         # 토스 표시 단위(100엔)
-    assert "조회 실패" in bot.handle("/rates", CFG, {}, NOW)
     assert "L%  1  3  5 10" in bot.handle("신호", CFG, quotes, NOW)
+    assert " 900.00 " in bot.handle("신호", CFG, quotes, NOW)        # 토스 표시 단위(100엔)
+    assert bot.handle("환율", CFG, quotes, NOW) == bot.handle("/signal", CFG, quotes, NOW)  # 환율 = 신호
     for text in ("매수 USD 1350 1000", "현황", "기록", "취소", "아무말", ""):
         assert bot.handle(text, CFG, quotes, NOW) == bot.HELP
 
