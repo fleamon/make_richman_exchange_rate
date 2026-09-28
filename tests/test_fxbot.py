@@ -32,7 +32,7 @@ def test_bot_only_answers_rates_signal_and_help():
     quotes = {"JPY": quote("JPY", 9.0, 8, 10)}
     assert "900.00" in bot.handle("환율", CFG, quotes, NOW)         # 토스 표시 단위(100엔)
     assert "조회 실패" in bot.handle("/rates", CFG, {}, NOW)
-    assert "LOW%  1d  3d  5d" in bot.handle("신호", CFG, quotes, NOW)
+    assert "LOW%\u2007\u20071d" in bot.handle("신호", CFG, quotes, NOW)   # 숫자 폭 공백으로 채운 표
     for text in ("매수 USD 1350 1000", "현황", "기록", "취소", "아무말", ""):
         assert bot.handle(text, CFG, quotes, NOW) == bot.HELP
 
@@ -91,6 +91,10 @@ def test_buy_table_columns_are_aligned(monkeypatch):
     body = bot._buy_rows(cfg, quotes)
     assert len({len(l) for l in body}) == 1                          # 머리글·구분선·통화 줄 폭이 같다
     assert all(l.isascii() for l in body)                            # 고정폭에서 밀리는 국기·한글 없음
+    plain = bot._buy_rows(cfg, quotes, plain=True)                    # 코드 블록 없이 보낼 표
+    punct = lambda l: sum(c in bot.PUNCT + bot.PUNCT_SPACE for c in l)
+    assert len({(len(l) - punct(l), punct(l)) for l in plain[2:]}) == 1  # 숫자 폭·쉼표 폭 칸 수가 줄마다 같다
+    assert " " not in "".join(plain)
 
 
 def test_probability_shrinks_toward_pooled():
