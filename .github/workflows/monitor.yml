@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: write           # 암호화 상태 파일 커밋 (매시간 커밋되므로 60일 무활동 자동 비활성화도 걸리지 않는다)
+  actions: read             # 같은 시각 중복 호출 확인
 
 concurrency:
   group: fx-monitor
@@ -32,20 +33,37 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # Cloudflare 워커가 같은 예약 시각에 봇을 두 번 부르는 일이 있다(2026-09-29 확인, 몇 초 간격).
+      # 90초 안에 먼저 불린 실행이 있으면 이번 실행은 아무것도 안 하고 끝낸다. 테스트 입력을 넣은 수동 실행은 그대로 돈다.
+      - name: 중복 호출 확인
+        id: dedupe
+        if: github.event_name == 'workflow_dispatch' && !inputs.force_signal && inputs.test_low_shift == '' && inputs.test_command == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          me=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" --jq '.created_at | fromdateiso8601')
+          dup=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/monitor.yml/runs?event=workflow_dispatch&per_page=10" \
+            --jq "[.workflow_runs[] | select(.id < $GITHUB_RUN_ID and ($me - (.created_at | fromdateiso8601)) < 90)] | length")
+          if [ "$dup" -gt 0 ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; echo "::notice::90초 안에 먼저 불린 실행이 있어 건너뜀"; fi
+
       # 워커가 같은 시각에 두 번 부르면 두 번째 실행은 concurrency 로 기다렸다 돈다. 기본값(부른 시점의 커밋)으로
       # 받으면 앞 실행이 올린 상태를 못 봐서 정기 신호·답장을 한 번 더 보내므로, 실행 시점의 main 끝을 받는다.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.dedupe.outputs.skip != 'true'
         with:
           ref: main
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: steps.dedupe.outputs.skip != 'true'
         with:
           python-version: "3.12"
           cache: pip
 
-      - run: pip install -q -r requirements.txt
+      - if: steps.dedupe.outputs.skip != 'true'
+        run: pip install -q -r requirements.txt
 
       - name: Monitor
+        if: steps.dedupe.outputs.skip != 'true'
         env:
           STATE_KEY: ${{ secrets.STATE_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -56,6 +74,7 @@ jobs:
         run: python -m fxbot run
 
       - name: Commit state
+        if: steps.dedupe.outputs.skip != 'true'
         run: |
           git add -A state
           git diff --cached --quiet && exit 0
