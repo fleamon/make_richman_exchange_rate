@@ -87,7 +87,8 @@ def _buy_rows(cfg: Config, quotes: dict[str, Quote], low_shift: float = 0) -> li
     ups = {q.code: [f"{probs[h] * 100:.0f}" if h in probs else "-" for h in odds.HORIZONS] for probs, _, q in rows}
     # 확률 열은 모두 같은 폭(보통 2자)에 한 칸씩 띄운다. 머리글 '10d' '20d' 만 한 자씩 길어 조금 삐져나온다.
     pw = max([2, *(len(u) for us in ups.values() for u in us)])
-    fmt = lambda ccy, rate, low, us: (f"{ccy:<3} {rate:>{w}} {low:>{lw}} "
+    # 환율은 왼쪽 정렬 — 통화 코드와 환율 사이를 항상 한 칸으로 붙이고, 남는 빈칸은 환율 뒤로 보낸다
+    fmt = lambda ccy, rate, low, us: (f"{ccy:<3} {rate:<{w}} {low:>{lw}} "
                                       + " ".join(f"{u:>{pw}}" for u in us))
     body = [(HEADER_ICON, fmt("CCY", "RATE", "L%", [f"{h}d" for h in odds.HORIZONS]))]
     body += [(flag(q.code), fmt(q.code, prices[q.code], lows[q.code], ups[q.code])) for _, _, q in rows]
