@@ -12,7 +12,7 @@ from .config import Config, Currency
 from .rates import Quote
 from .strategy import PRIORITY, percentile
 
-HELP = """환율 알림 봇 (매수·보유 기록 기능은 없앴습니다)
+HELP = """환율 알림 봇
 환율 — 전체 통화 현재 환율과 기간 내 위치
 신호 — 매수 확률 표 지금 보기
 (/rates /signal 도 가능)"""
