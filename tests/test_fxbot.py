@@ -128,7 +128,7 @@ def test_history_shows_average_of_holdings():
     for cmd in ("매수 JPY 900 100000", "매수 JPY 880 100000", "매도 JPY 950 50000", "매수 USD 1300 10"):
         bot.handle(cmd, st, CFG, {}, NOW)
     text = bot.handle("현황", st, CFG, {"USD": quote("USD", 1310)}, NOW)
-    rows = {l.split()[0]: l.split() for l in table_lines(text)}
+    rows = {l.split()[1]: l.split()[1:] for l in table_lines(text)}
     # 선입선출로 900원 5만엔 + 880원 10만엔이 남음 → 평균 886.67
     assert rows["JPY"] == ["JPY", "150,000.00", "886.67", "-"]
     assert rows["USD"] == ["USD", "10.00", "1,300.00", "+100"]
@@ -170,7 +170,7 @@ def test_buy_text_is_table_sorted_by_percentile(monkeypatch):
     mk = lambda c, p: Quote(c, p, hist, NOW)
     quotes = {"USD": mk("USD", 100), "EUR": mk("EUR", 100), "JPY": mk("JPY", 100), "GBP": mk("GBP", 159)}
     body = table_lines(buy_text(cfg, quotes))
-    assert [l.split()[0] for l in body[1:]] == ["EUR", "JPY", "USD", "GBP"]  # 하위 0% 셋(확률 순) → 하위 98%
+    assert [l.split()[1] for l in body[1:]] == ["EUR", "JPY", "USD", "GBP"]  # 하위 0% 셋(확률 순) → 하위 98%
     assert body[0].split()[-5:] == [str(h) for h in odds.HORIZONS]
     assert all(len(l) == len(body[0]) or True for l in body)
 

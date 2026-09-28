@@ -50,6 +50,11 @@ def label(cur: Currency) -> str:
     return f"{cur.code}({cur.name})"
 
 
+def flag(code: str) -> str:
+    """통화 코드 앞 두 글자(= 국가 코드)로 국기 이모지. EUR 은 EU 깃발."""
+    return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in code[:2])
+
+
 def _width(s: str) -> int:
     """고정폭 글꼴에서 차지하는 칸 수 (한글·이모지는 두 칸, 국기는 두 글자가 합쳐져 두 칸)."""
     return sum(1 if 0x1F1E6 <= ord(c) <= 0x1F1FF else
@@ -61,13 +66,13 @@ def _pad(s: str, width: int, right: bool = True) -> str:
     return fill + s if right else s + fill
 
 
-TABLE_WIDTH = 33   # 모든 표의 줄 폭을 같게 둬야 텔레그램이 코드 블록을 같은 글꼴 크기로 그린다
-                   # (표 안에는 ASCII 만 둔다 — 이모지·한글은 고정폭 글꼴에서 폭이 달라 열이 밀린다)
+TABLE_WIDTH = 36   # 모든 표의 줄 폭을 같게 둬야 텔레그램이 코드 블록을 같은 글꼴 크기로 그린다
 
 
 def _table(rows: list[str]) -> str:
     """고정폭 표. 줄 끝 공백은 텔레그램이 버리므로 마지막 칸은 항상 숫자로 끝나게 오른쪽 정렬한다."""
-    return "\n".join(_pad(r.rstrip(), TABLE_WIDTH) for r in rows)
+    body = "\n".join(_pad(r.rstrip(), TABLE_WIDTH) for r in rows)
+    return f"<pre>{html.escape(body, quote=False)}</pre>"
 
 
 def _num(s: str) -> float:
@@ -148,10 +153,10 @@ def status_text(state: dict, cfg: Config, quotes: dict[str, Quote]) -> str:
         cost_sum += cost
         pnl = amount * q.price * (1 - cur.sell_fee) - cost if q else None
         total += pnl or 0.0
-        body.append("".join([_pad(code, 4, right=False),
+        body.append("".join([_pad(f"{flag(code)} {code}", 7, right=False),
                              _pad(f"{amount:,.2f}", 10), _pad(fx(avg, cur), 9),
                              _pad(f"{pnl:+,.0f}" if pnl is not None else "-", 10)]))
-    return ("[3안] 보유 현황\n"
+    return ("💰 보유 현황\n"
             "(수량 / 평균 매수가 / 평가손익)\n\n"
             f"{_table(body)}\n\n"
             f"총 원가 {won(cost_sum)}\n"
@@ -189,9 +194,9 @@ def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
         rows.append((odds.probabilities(table, q.code, pct), pct, q))
     rows.sort(key=lambda r: (round(r[1]), -(r[0].get(odds.RANK_HORIZON) or 0), rank.get(r[2].code, len(rank))))
 
-    body = [" " * 17 + "".join(_pad(str(h), 4 if i == 0 else 3) for i, h in enumerate(odds.HORIZONS))]
+    body = [" " * 20 + "".join(_pad(str(h), 4 if i == 0 else 3) for i, h in enumerate(odds.HORIZONS))]
     for probs, pct, q in rows:
-        cells = [_pad(q.code, 4, right=False),
+        cells = [_pad(f"{flag(q.code)} {q.code}", 7, right=False),
                  _pad(fx(q.price, cfg.currencies[q.code]), 9), _pad(f"{pct:.0f}%", 4)]
         cells += [_pad(f"{probs[h] * 100:.0f}" if h in probs else "-", 4 if i == 0 else 3)
                   for i, h in enumerate(odds.HORIZONS)]
@@ -201,7 +206,7 @@ def buy_text(cfg: Config, quotes: dict[str, Quote]) -> str:
             "※ 1~20 = 그 거래일 뒤 오른 비율(%)",
             "※ 과거 10년 같은 구간 기준 · 참고용",
             "기록: '매수 통화 환율 수량'"]
-    return (f"[3안] 매수 신호 · {len(rows)}개 통화\n\n{_table(body)}\n\n"
+    return (f"🟢 매수 신호 · {len(rows)}개 통화\n\n{_table(body)}\n\n"
             + html.escape("\n".join(note), quote=False))
 
 
@@ -209,12 +214,12 @@ def signals_text(side: str, signals: list[Signal], cfg: Config) -> str:
     """매도 신호를 고정폭 표 하나로 (환율 / 하위 % / 예상 이익). 하위 % 오름차순."""
     sigs = sort_signals([s for s in signals if s.side == side])
     if not sigs:
-        return "[3안] 매도 신호 없음"
-    body = ["".join([_pad(sig.code, 4, right=False),
+        return "🔴 매도 신호 없음"
+    body = ["".join([_pad(f"{flag(sig.code)} {sig.code}", 7, right=False),
                      _pad(fx(sig.price, cfg.currencies[sig.code]), 9),
                      _pad(f"{sig.percentile:.0f}%", 4), _pad(f"{sig.profit:+,.0f}", 16)])
             for sig in sigs]
-    return (f"[3안] 매도 신호 {len(sigs)}건\n"
+    return (f"🔴 매도 신호 {len(sigs)}건\n"
             "(환율 / 하위 % / 예상 이익)\n\n"
             f"{_table(body)}\n\n"
             "기록: '매도 통화 환율 수량'")
