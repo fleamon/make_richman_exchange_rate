@@ -1,10 +1,8 @@
 name: fx-monitor
 
+# 실행은 Cloudflare Worker(matmap-social-cron)가 10분마다 workflow_dispatch 로 부르는 것뿐이다.
+# GitHub 예약 실행(예비)은 기록이 10분에 한 번씩만 찍히도록 뺐다(2026-09-29).
 on:
-  schedule:
-    # GitHub 예약 실행은 자주 빠진다. 주 실행은 Cloudflare Worker(matmap-social-cron)가
-    # 10분마다 workflow_dispatch 로 부르고, 이 예약은 그게 멈췄을 때의 예비다.
-    - cron: "7,37 * * * *"
   workflow_dispatch:        # Cloudflare Worker 호출, 또는 텔레그램 기록을 바로 반영하고 싶을 때 수동 실행
     inputs:
       force_signal:
