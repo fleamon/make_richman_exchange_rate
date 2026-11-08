@@ -17,6 +17,11 @@ def percentile(price: float, history: list[float]) -> float:
     return 100 * sum(1 for h in history if h < price * (1 - 1e-3)) / len(history)
 
 
-def signal_slot(now: datetime) -> str:
-    """알림은 한국 시각 기준 1시간에 한 번만 보낸다. 같은 시간대의 두 번째 실행은 명령만 처리한다."""
-    return (now + timedelta(hours=9)).strftime("%Y-%m-%dT%H")
+# 정기 알림을 보내는 한국 시각 (시). 이 시간대 안의 첫 실행이 한 번 보낸다.
+SIGNAL_HOURS = (4, 10, 16, 22)
+
+
+def signal_slot(now: datetime) -> str | None:
+    """알림은 한국 시각 4·10·16·22시대에 한 번씩만 보낸다. 그 밖의 시간이면 None (명령만 처리한다)."""
+    kst = now + timedelta(hours=9)
+    return kst.strftime("%Y-%m-%dT%H") if kst.hour in SIGNAL_HOURS else None

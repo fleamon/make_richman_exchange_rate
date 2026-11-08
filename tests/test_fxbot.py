@@ -47,11 +47,15 @@ def test_state_roundtrip(tmp_path, monkeypatch):
     assert path.stat().st_size == size  # 내용이 늘어도 파일 크기로 드러나지 않음
 
 
-def test_signal_slot_is_hourly_kst():
-    base = datetime(2026, 9, 25, 3, 7, tzinfo=timezone.utc)  # 한국 12:07
-    assert strategy.signal_slot(base) == strategy.signal_slot(base + timedelta(minutes=30))
-    assert strategy.signal_slot(base) != strategy.signal_slot(base + timedelta(minutes=60))
-    assert strategy.signal_slot(base) == "2026-09-25T12"
+def test_signal_slot_only_at_4_10_16_22_kst():
+    base = datetime(2026, 9, 25, 1, 7, tzinfo=timezone.utc)  # 한국 10:07
+    assert strategy.signal_slot(base) == "2026-09-25T10"
+    assert strategy.signal_slot(base + timedelta(minutes=50)) == "2026-09-25T10"
+    assert strategy.signal_slot(base + timedelta(minutes=60)) is None    # 11시
+    assert strategy.signal_slot(base + timedelta(hours=6)) == "2026-09-25T16"
+    assert strategy.signal_slot(base + timedelta(hours=12)) == "2026-09-25T22"
+    assert strategy.signal_slot(base + timedelta(hours=18)) == "2026-09-26T04"
+    assert strategy.signal_slot(base - timedelta(hours=7)) is None       # 03시
 
 
 def test_report_has_only_time_and_buy_table():

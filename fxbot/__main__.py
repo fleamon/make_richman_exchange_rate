@@ -38,9 +38,11 @@ def run() -> None:
         # 무슨 말을 보내든(여러 통이어도) 신호 표 한 통으로 답한다. 정기 알림과 겹치면 그것도 한 통으로 끝낸다.
         slot = strategy.signal_slot(now)
         asked = bool(texts) or bool(os.environ.get("TEST_COMMAND"))
-        if asked or st.get("signal_slot") != slot or os.environ.get("FORCE_SIGNAL"):
+        due = slot is not None and st.get("signal_slot") != slot
+        if asked or due or os.environ.get("FORCE_SIGNAL"):
             tg.send(report_text(now, cfg, quotes))
-            st["signal_slot"] = slot
+            if slot is not None:
+                st["signal_slot"] = slot
         if os.environ.get("TEST_LOW_SHIFT"):   # 표 모양 확인용 테스트 메시지 (하위 % 를 올려서)
             tg.send(report_text(now, cfg, quotes, low_shift=float(os.environ["TEST_LOW_SHIFT"]), test=True))
     st.pop("alerts", None)

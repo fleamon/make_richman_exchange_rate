@@ -19,7 +19,7 @@ on:
         default: ""
 
 permissions:
-  contents: write           # 암호화 상태 파일 커밋 (매시간 커밋되므로 60일 무활동 자동 비활성화도 걸리지 않는다)
+  contents: write           # 암호화 상태 파일 커밋 (매일 커밋되므로 60일 무활동 자동 비활성화도 걸리지 않는다)
   actions: read             # 같은 시각 중복 호출 확인
 
 concurrency:
